@@ -1,5 +1,4 @@
 'use client'
-
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -9,16 +8,15 @@ import {
 } from '@/app/lib/supabase'
 import type { MenuItem, Order, OrderStatus } from '@/app/lib/supabase'
 
-// ─────────────────────────────────────────────
-const OWNER_WA   = '2348094946923'
-const CATS       = ['Soups','Stews','Rice & Pottage','Pasta & Rice','Food Boxes']
-const SUBCATS    = ['','Pasta','Rice']
-const TABS       = ['📋 Orders','🍽️ Menu','📊 Stats'] as const
-type Tab         = typeof TABS[number]
+const OWNER_WA = '2348094946923'
+const CATS     = ['Soups','Stews','Rice & Pottage','Pasta & Rice','Food Boxes']
+const SUBCATS  = ['','Pasta','Rice']
+const TABS     = ['📋 Orders','🍽️ Menu','💬 Inbox','📊 Stats'] as const
+type Tab       = typeof TABS[number]
 
 const STATUS: Record<OrderStatus,{label:string;color:string;bg:string;next?:OrderStatus}> = {
-  new:       {label:'🆕 New',       color:'#60A5FA',bg:'rgba(96,165,250,0.15)', next:'confirmed'},
-  confirmed: {label:'✅ Confirmed', color:'#4ADE80',bg:'rgba(74,222,128,0.15)', next:'preparing'},
+  new:       {label:'🆕 New',       color:'#60A5FA',bg:'rgba(96,165,250,0.15)',  next:'confirmed'},
+  confirmed: {label:'✅ Confirmed', color:'#4ADE80',bg:'rgba(74,222,128,0.15)',  next:'preparing'},
   preparing: {label:'👩‍🍳 Preparing',color:'#FBBF24',bg:'rgba(251,191,36,0.15)', next:'ready'},
   ready:     {label:'📦 Ready',     color:'#F97316',bg:'rgba(249,115,22,0.15)',  next:'delivered'},
   delivered: {label:'🎉 Delivered', color:'#A3E635',bg:'rgba(163,230,53,0.15)'},
@@ -32,7 +30,6 @@ const EMPTY: Omit<MenuItem,'updated_at'> = {
 }
 
 const fmt     = (n:number) => '₦'+n.toLocaleString('en-NG')
-const slug    = (s:string) => s.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
 const timeAgo = (d:string) => {
   const s=(Date.now()-new Date(d).getTime())/1000
   if(s<60)    return 'just now'
@@ -56,25 +53,37 @@ export default function AdminPage() {
     return ()=>subscription.unsubscribe()
   },[])
 
-  if(!mounted) return null
-  if(loading)  return <Loader text="Loading…" fullPage />
+  if(!mounted||loading) return <Loader text="Loading…" fullPage />
   if(!session) return <LoginScreen />
   return <Dashboard />
 }
 
 // ══════════════════════════════════════════════
-// LOGIN
+// LOGIN — with forgot password flow
 // ══════════════════════════════════════════════
 function LoginScreen() {
+  const [mode,setMode]       = useState<'login'|'forgot'|'sent'>('login')
   const [email,setEmail]     = useState('')
   const [pass,setPass]       = useState('')
   const [err,setErr]         = useState('')
   const [busy,setBusy]       = useState(false)
 
   const login = async () => {
+    if(!email||!pass) return setErr('Please enter email and password')
     setBusy(true);setErr('')
     const {error:e} = await supabase.auth.signInWithPassword({email,password:pass})
     if(e) setErr(e.message)
+    setBusy(false)
+  }
+
+  const sendReset = async () => {
+    if(!email) return setErr('Enter your email address first')
+    setBusy(true);setErr('')
+    const {error:e} = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/admin/reset-password`
+    })
+    if(e) { setErr(e.message); setBusy(false); return }
+    setMode('sent')
     setBusy(false)
   }
 
@@ -84,14 +93,65 @@ function LoginScreen() {
         <div style={{textAlign:'center',marginBottom:'2rem'}}>
           <div style={{fontSize:'2.5rem',marginBottom:'0.5rem'}}>🍽️</div>
           <h1 style={{color:'#fff',fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700}}>Chizzychops Admin</h1>
-          <p style={{color:'rgba(255,255,255,0.4)',fontSize:'0.875rem',marginTop:'0.25rem'}}>Owner access only</p>
+          <p style={{color:'rgba(255,255,255,0.4)',fontSize:'0.875rem',marginTop:'0.25rem'}}>
+            {mode==='login' ? 'Owner access only' : mode==='forgot' ? 'Reset your password' : 'Check your email'}
+          </p>
         </div>
-        <div style={{display:'flex',flexDirection:'column',gap:'1rem'}}>
-          <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()} style={IS} />
-          <input type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==='Enter'&&login()} style={IS} />
-          {err&&<p style={{color:'#F87171',fontSize:'0.8125rem',textAlign:'center'}}>{err}</p>}
-          <button onClick={login} disabled={busy} style={{...BP,opacity:busy?0.7:1}}>{busy?'Signing in…':'Sign In'}</button>
-        </div>
+
+        {mode === 'sent' ? (
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:'3rem',marginBottom:'1rem'}}>📧</div>
+            <p style={{color:'rgba(255,255,255,0.7)',lineHeight:1.7,marginBottom:'1.5rem'}}>
+              Password reset link sent to <strong style={{color:'#F97316'}}>{email}</strong>.
+              Check your inbox and click the link to set a new password.
+            </p>
+            <button onClick={()=>setMode('login')} style={{color:'#F97316',fontWeight:700,background:'none',border:'none',cursor:'pointer',fontSize:'0.9rem'}}>
+              ← Back to Sign In
+            </button>
+          </div>
+        ) : (
+          <div style={{display:'flex',flexDirection:'column',gap:'1rem'}}>
+            <div>
+              <label style={LBL}>Email Address</label>
+              <input type="email" placeholder="owner@chizzychops.com" value={email}
+                onChange={e=>{setEmail(e.target.value);setErr('')}}
+                onKeyDown={e=>e.key==='Enter'&&(mode==='login'?login():sendReset())}
+                style={IS} autoComplete="email" />
+            </div>
+
+            {mode==='login' && (
+              <div>
+                <label style={LBL}>Password</label>
+                <input type="password" placeholder="Your password" value={pass}
+                  onChange={e=>{setPass(e.target.value);setErr('')}}
+                  onKeyDown={e=>e.key==='Enter'&&login()}
+                  style={IS} autoComplete="current-password" />
+              </div>
+            )}
+
+            {err && <p style={{color:'#F87171',fontSize:'0.8125rem',textAlign:'center',lineHeight:1.5}}>{err}</p>}
+
+            {mode==='login' ? (
+              <>
+                <button onClick={login} disabled={busy} style={{...BP,opacity:busy?0.7:1}}>
+                  {busy?'Signing in…':'Sign In'}
+                </button>
+                <button onClick={()=>{setMode('forgot');setErr('')}} style={{background:'none',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'0.8125rem',cursor:'pointer',textAlign:'center',padding:'0.25rem'}}>
+                  Forgot your password?
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={sendReset} disabled={busy} style={{...BP,opacity:busy?0.7:1,background:'linear-gradient(135deg,#8B5CF6,#6D28D9)'}}>
+                  {busy?'Sending…':'Send Reset Link'}
+                </button>
+                <button onClick={()=>{setMode('login');setErr('')}} style={{background:'none',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'0.8125rem',cursor:'pointer',textAlign:'center',padding:'0.25rem'}}>
+                  ← Back to Sign In
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -101,19 +161,22 @@ function LoginScreen() {
 // DASHBOARD
 // ══════════════════════════════════════════════
 function Dashboard() {
-  const [tab,setTab]         = useState<Tab>('📋 Orders')
-  const [orders,setOrders]   = useState<Order[]>([])
-  const [menu,setMenu]       = useState<MenuItem[]>([])
-  const [loadO,setLoadO]     = useState(true)
-  const [loadM,setLoadM]     = useState(true)
-  const [toast,setToast]     = useState('')
-  const [newCnt,setNewCnt]   = useState(0)
+  const [tab,setTab]       = useState<Tab>('📋 Orders')
+  const [orders,setOrders] = useState<Order[]>([])
+  const [menu,setMenu]     = useState<MenuItem[]>([])
+  const [inbox,setInbox]   = useState<any[]>([])
+  const [loadO,setLoadO]   = useState(true)
+  const [loadM,setLoadM]   = useState(true)
+  const [loadI,setLoadI]   = useState(true)
+  const [toast,setToast]   = useState('')
+  const [newCnt,setNewCnt] = useState(0)
+  const [inboxCnt,setInboxCnt] = useState(0)
 
   const showToast = (msg:string) => {setToast(msg);setTimeout(()=>setToast(''),4000)}
 
   const loadOrders = useCallback(async()=>{
     setLoadO(true)
-    try{const o=await fetchOrders();setOrders(o);setNewCnt(o.filter((x:Order)=>x.status==='new').length)}
+    try{const o=await fetchOrders();setOrders(o);setNewCnt(o.filter(x=>x.status==='new').length)}
     catch(e:any){showToast('❌ '+e.message)}
     setLoadO(false)
   },[])
@@ -125,20 +188,58 @@ function Dashboard() {
     setLoadM(false)
   },[])
 
-  useEffect(()=>{loadOrders();loadMenu()},[])
+  const loadInbox = useCallback(async()=>{
+    setLoadI(true)
+    try{
+      const [c,r,cat] = await Promise.all([
+        supabase.from('contact_submissions').select('*').order('created_at',{ascending:false}).limit(50),
+        supabase.from('review_submissions').select('*').order('created_at',{ascending:false}).limit(50),
+        supabase.from('catering_submissions').select('*').order('created_at',{ascending:false}).limit(50),
+      ])
+      const all=[
+        ...(c.data||[]).map((x:any)=>({...x,_type:'contact'})),
+        ...(r.data||[]).map((x:any)=>({...x,_type:'review'})),
+        ...(cat.data||[]).map((x:any)=>({...x,_type:'catering'})),
+      ].sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())
+      setInbox(all)
+      setInboxCnt(all.length)
+    }catch(e:any){showToast('❌ '+e.message)}
+    setLoadI(false)
+  },[])
 
-  // Realtime
+  useEffect(()=>{loadOrders();loadMenu();loadInbox()},[])
+
+  // Realtime — orders
   useEffect(()=>{
     const ch = supabase.channel('admin-rt')
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'orders'},p=>{
         const o=p.new as Order
         setOrders(prev=>[o,...prev]);setNewCnt(n=>n+1)
-        showToast(`🆕 New order! ${o.id}`)
+        showToast(`🆕 New order! ${o.id} — ${fmt(o.total)}`)
         notifyWA(o)
         try{new Audio('/notification.mp3').play()}catch{}
       })
       .on('postgres_changes',{event:'UPDATE',schema:'public',table:'orders'},p=>{
-        setOrders(prev=>prev.map((x:Order)=>x.id===p.new.id?p.new as Order:x))
+        setOrders(prev=>prev.map(x=>x.id===p.new.id?p.new as Order:x))
+      })
+      // Live inbox notifications
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'contact_submissions'},p=>{
+        const d=p.new as any
+        setInbox(prev=>[{...d,_type:'contact'},...prev])
+        setInboxCnt(n=>n+1)
+        showToast(`💬 New message from ${d.name}!`)
+      })
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'review_submissions'},p=>{
+        const d=p.new as any
+        setInbox(prev=>[{...d,_type:'review'},...prev])
+        setInboxCnt(n=>n+1)
+        showToast(`⭐ New review from ${d.name}!`)
+      })
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'catering_submissions'},p=>{
+        const d=p.new as any
+        setInbox(prev=>[{...d,_type:'catering'},...prev])
+        setInboxCnt(n=>n+1)
+        showToast(`🎉 Catering request from ${d.name}!`)
       })
       .subscribe()
     return ()=>{supabase.removeChannel(ch)}
@@ -146,7 +247,7 @@ function Dashboard() {
 
   const notifyWA = (o:Order) => {
     const lines=(o.items as any[]).map(i=>`• ${i.name} x${i.qty} — ${fmt(i.price*i.qty)}`)
-    const msg=[`🆕 *NEW ORDER — ${o.id}*`,'',`👤 ${o.customer_name||'Unknown'}`,o.customer_phone?`📞 ${o.customer_phone}`:'','',...lines,'',`💰 *Total: ${fmt(o.total)}*`,o.note?`📝 ${o.note}`:'',o.address?`📍 ${o.address}`:'','',`⏰ ${new Date(o.created_at).toLocaleString('en-NG')}`,'',`https://chizzychops.vercel.app/admin`].filter(Boolean).join('\n')
+    const msg=[`🆕 *NEW ORDER — ${o.id}*`,'',`👤 ${o.customer_name||'Unknown'}`,o.customer_phone?`📞 ${o.customer_phone}`:'','',...lines,'',`💰 *Total: ${fmt(o.total)}*`,o.note?`📝 ${o.note}`:'',o.address?`📍 ${o.address}`:'','',`https://chizzychops.vercel.app/admin`].filter(Boolean).join('\n')
     window.open(`https://wa.me/${OWNER_WA}?text=${encodeURIComponent(msg)}`,'_blank')
   }
 
@@ -156,13 +257,13 @@ function Dashboard() {
   }
   const onDeleteOrder = async(id:string)=>{
     if(!confirm(`Delete order ${id}?`))return
-    try{await deleteOrder(id);setOrders(p=>p.filter((o:Order)=>o.id!==id));showToast('🗑 Deleted')}
+    try{await deleteOrder(id);setOrders(p=>p.filter(o=>o.id!==id));showToast('🗑 Deleted')}
     catch(e:any){showToast('❌ '+e.message)}
   }
 
-  const today    = orders.filter((o:Order)=>new Date(o.created_at).toDateString()===new Date().toDateString())
-  const active   = orders.filter((o:Order)=>!['delivered','cancelled'].includes(o.status))
-  const revenue  = orders.filter((o:Order)=>o.status==='delivered').reduce((s:number,o:Order)=>s+o.total,0)
+  const today   = orders.filter(o=>new Date(o.created_at).toDateString()===new Date().toDateString())
+  const active  = orders.filter(o=>!['delivered','cancelled'].includes(o.status))
+  const revenue = orders.filter(o=>o.status==='delivered').reduce((s,o)=>s+o.total,0)
 
   return (
     <div style={{minHeight:'100vh',background:'#0A0300',color:'#fff',fontFamily:'system-ui,sans-serif'}}>
@@ -192,14 +293,16 @@ function Dashboard() {
             style={{padding:'0.75rem 1rem',background:'none',border:'none',cursor:'pointer',fontWeight:700,fontSize:'0.8125rem',color:tab===t?'#F97316':'rgba(255,255,255,0.4)',borderBottom:tab===t?'2px solid #F97316':'2px solid transparent',transition:'all 0.2s',position:'relative',whiteSpace:'nowrap'}}>
             {t}
             {t==='📋 Orders'&&newCnt>0&&<span style={{position:'absolute',top:'5px',right:'2px',background:'#DC2626',color:'#fff',width:'14px',height:'14px',borderRadius:'50%',fontSize:'0.5rem',fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center'}}>{newCnt}</span>}
+            {t==='💬 Inbox'&&inboxCnt>0&&<span style={{position:'absolute',top:'5px',right:'2px',background:'#8B5CF6',color:'#fff',width:'14px',height:'14px',borderRadius:'50%',fontSize:'0.5rem',fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center'}}>{inboxCnt}</span>}
           </button>
         ))}
       </div>
 
       <div style={{maxWidth:'1280px',margin:'0 auto',padding:'1rem'}}>
-        {tab==='📋 Orders'&&<OrdersPanel orders={orders} loading={loadO} onStatusChange={onStatusChange} onDelete={onDeleteOrder} onNotify={notifyWA} onRefresh={loadOrders} todayCount={today.length} activeCount={active.length} revenue={revenue}/>}
-        {tab==='🍽️ Menu'  &&<MenuPanel items={menu} loading={loadM} onRefresh={loadMenu} showToast={showToast}/>}
-        {tab==='📊 Stats' &&<StatsPanel orders={orders} menuItems={menu}/>}
+        {tab==='📋 Orders' && <OrdersPanel orders={orders} loading={loadO} onStatusChange={onStatusChange} onDelete={onDeleteOrder} onNotify={notifyWA} onRefresh={loadOrders} todayCount={today.length} activeCount={active.length} revenue={revenue}/>}
+        {tab==='🍽️ Menu'   && <MenuPanel items={menu} loading={loadM} onRefresh={loadMenu} showToast={showToast}/>}
+        {tab==='💬 Inbox'  && <InboxPanel items={inbox} loading={loadI} onRefresh={loadInbox}/>}
+        {tab==='📊 Stats'  && <StatsPanel orders={orders} menuItems={menu} inbox={inbox}/>}
       </div>
 
       {toast&&(
@@ -207,12 +310,104 @@ function Dashboard() {
           {toast}
         </div>
       )}
+      <style>{`@keyframes pulse2{0%,100%{opacity:1}50%{opacity:0.5}} select option{background:#1A0800;color:#fff} @media(max-width:700px){.mobile-cards{display:flex!important;flex-direction:column;gap:0.625rem}.desktop-table{display:none!important}}`}</style>
+    </div>
+  )
+}
 
-      <style>{`
-        @keyframes pulse2{0%,100%{opacity:1}50%{opacity:0.5}}
-        select option{background:#1A0800;color:#fff}
-        @media(max-width:600px){.desktop-only{display:none!important}}
-      `}</style>
+// ══════════════════════════════════════════════
+// INBOX PANEL — Contact, Reviews, Catering
+// ══════════════════════════════════════════════
+function InboxPanel({items,loading,onRefresh}:{items:any[];loading:boolean;onRefresh:()=>void}) {
+  const [filter,setFilter] = useState<'all'|'contact'|'review'|'catering'>('all')
+  const shown = filter==='all' ? items : items.filter(i=>i._type===filter)
+
+  const typeConfig:Record<string,{label:string;color:string;bg:string;icon:string}> = {
+    contact:  {label:'Message',  color:'#60A5FA',bg:'rgba(96,165,250,0.12)', icon:'💬'},
+    review:   {label:'Review',   color:'#FBBF24',bg:'rgba(251,191,36,0.12)', icon:'⭐'},
+    catering: {label:'Catering', color:'#A78BFA',bg:'rgba(167,139,250,0.12)',icon:'🎉'},
+  }
+
+  return (
+    <div>
+      <div style={{display:'flex',gap:'0.375rem',flexWrap:'wrap',marginBottom:'0.875rem',alignItems:'center'}}>
+        {(['all','contact','review','catering'] as const).map(f=>(
+          <button key={f} onClick={()=>setFilter(f)} style={{padding:'0.3rem 0.75rem',borderRadius:'9999px',fontSize:'0.75rem',fontWeight:700,border:'1px solid transparent',cursor:'pointer',
+            background:filter===f?'linear-gradient(135deg,#F97316,#DC2626)':'rgba(255,255,255,0.04)',
+            color:filter===f?'#fff':'rgba(255,255,255,0.5)'}}>
+            {f==='all'?`All (${items.length})`:typeConfig[f].icon+' '+typeConfig[f].label+'s ('+items.filter(i=>i._type===f).length+')'}
+          </button>
+        ))}
+        <button onClick={onRefresh} style={{...BS,fontSize:'0.75rem',padding:'0.3rem 0.75rem',marginLeft:'auto'}}>🔄</button>
+      </div>
+
+      {loading?<Loader text="Loading inbox…"/>:shown.length===0?(
+        <div style={{textAlign:'center',padding:'3rem',color:'rgba(255,255,255,0.3)'}}>
+          <div style={{fontSize:'2.5rem',marginBottom:'0.5rem'}}>📭</div>
+          <p style={{fontSize:'0.875rem'}}>No submissions yet.</p>
+        </div>
+      ):(
+        <div style={{display:'flex',flexDirection:'column',gap:'0.5rem'}}>
+          {shown.map((item:any)=>{
+            const cfg=typeConfig[item._type]
+            return (
+              <div key={item.id} style={{background:'#120600',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'0.875rem',padding:'1rem',display:'flex',flexDirection:'column',gap:'0.5rem'}}>
+                {/* Header */}
+                <div style={{display:'flex',alignItems:'center',gap:'0.625rem',flexWrap:'wrap'}}>
+                  <span style={{background:cfg.bg,color:cfg.color,fontSize:'0.625rem',fontWeight:800,padding:'0.2rem 0.5rem',borderRadius:'9999px'}}>{cfg.icon} {cfg.label}</span>
+                  <span style={{color:'#fff',fontWeight:700,fontSize:'0.875rem'}}>{item.name}</span>
+                  {item.phone&&<span style={{color:'#25D366',fontSize:'0.8125rem'}}>📞 {item.phone}</span>}
+                  {item.email&&<span style={{color:'rgba(255,255,255,0.4)',fontSize:'0.75rem'}}>{item.email}</span>}
+                  <span style={{color:'rgba(255,255,255,0.3)',fontSize:'0.6875rem',marginLeft:'auto'}}>{timeAgo(item.created_at)}</span>
+                </div>
+
+                {/* Content by type */}
+                {item._type==='contact'&&(
+                  <div style={{background:'rgba(255,255,255,0.03)',borderRadius:'0.625rem',padding:'0.75rem'}}>
+                    <p style={{color:'rgba(255,255,255,0.7)',fontSize:'0.875rem',lineHeight:1.7}}>{item.message}</p>
+                  </div>
+                )}
+
+                {item._type==='review'&&(
+                  <div style={{background:'rgba(255,255,255,0.03)',borderRadius:'0.625rem',padding:'0.75rem',display:'flex',flexDirection:'column',gap:'0.375rem'}}>
+                    <div style={{display:'flex',gap:'1rem',flexWrap:'wrap'}}>
+                      <span style={{color:'rgba(255,255,255,0.55)',fontSize:'0.8125rem'}}>Dish: <strong style={{color:'#F97316'}}>{item.dish}</strong></span>
+                      <span style={{color:'#FBBF24',fontSize:'0.8125rem',fontWeight:700}}>{'⭐'.repeat(item.overall)} {item.overall}/5</span>
+                      <span style={{color:item.recommend?'#4ADE80':'#F87171',fontSize:'0.8125rem',fontWeight:700}}>{item.recommend?'👍 Recommends':'👎 Does not recommend'}</span>
+                    </div>
+                    <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
+                      {[['taste',item.taste],['portion',item.portion],['delivery',item.delivery],['packaging',item.packaging],['value',item.value]].map(([k,v])=>(
+                        <span key={k as string} style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.06)',padding:'0.2rem 0.5rem',borderRadius:'0.375rem',fontSize:'0.6875rem',color:'rgba(255,255,255,0.5)'}}>{k}: {v}/5</span>
+                      ))}
+                    </div>
+                    <p style={{color:'rgba(255,255,255,0.65)',fontSize:'0.875rem',lineHeight:1.7,fontStyle:'italic'}}>"{item.review_text}"</p>
+                  </div>
+                )}
+
+                {item._type==='catering'&&(
+                  <div style={{background:'rgba(255,255,255,0.03)',borderRadius:'0.625rem',padding:'0.75rem',display:'flex',flexDirection:'column',gap:'0.375rem'}}>
+                    <div style={{display:'flex',gap:'1rem',flexWrap:'wrap'}}>
+                      <span style={{color:'rgba(255,255,255,0.55)',fontSize:'0.8125rem'}}>📅 <strong style={{color:'#fff'}}>{item.event_date}</strong></span>
+                      <span style={{color:'rgba(255,255,255,0.55)',fontSize:'0.8125rem'}}>👥 <strong style={{color:'#fff'}}>{item.guests} guests</strong></span>
+                      {item.event_type&&<span style={{color:'rgba(255,255,255,0.55)',fontSize:'0.8125rem'}}>🎊 <strong style={{color:'#fff'}}>{item.event_type}</strong></span>}
+                    </div>
+                    {item.notes&&<p style={{color:'rgba(255,255,255,0.6)',fontSize:'0.8125rem',lineHeight:1.7}}>📝 {item.notes}</p>}
+                  </div>
+                )}
+
+                {/* Reply on WhatsApp */}
+                {item.phone&&(
+                  <a href={`https://wa.me/${item.phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hi ${item.name}! Thanks for reaching out to Chizzychops & Grillz 🍽️`)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{display:'inline-flex',alignItems:'center',gap:'0.375rem',background:'rgba(37,211,102,0.1)',border:'1px solid rgba(37,211,102,0.2)',color:'#4ADE80',padding:'0.375rem 0.75rem',borderRadius:'9999px',fontSize:'0.75rem',fontWeight:700,textDecoration:'none',width:'fit-content'}}>
+                    📲 Reply on WhatsApp
+                  </a>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -230,13 +425,12 @@ function OrdersPanel({orders,loading,onStatusChange,onDelete,onNotify,onRefresh,
 }) {
   const [filter,setFilter]     = useState<OrderStatus|'all'>('all')
   const [expanded,setExpanded] = useState<string|null>(null)
-  const shown = filter==='all'?orders:orders.filter((o:Order)=>o.status===filter)
+  const shown = filter==='all'?orders:orders.filter(o=>o.status===filter)
 
   return (
     <div>
-      {/* Stats cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:'0.625rem',marginBottom:'1rem'}}>
-        {[{l:'Today',v:todayCount,i:'📅',c:'#60A5FA'},{l:'Active',v:activeCount,i:'🔥',c:'#F97316'},{l:'New',v:orders.filter((o:Order)=>o.status==='new').length,i:'🆕',c:'#DC2626'},{l:'Done',v:orders.filter((o:Order)=>o.status==='delivered').length,i:'✅',c:'#4ADE80'},{l:'Revenue',v:fmt(revenue),i:'💰',c:'#FBBF24'}].map(s=>(
+        {[{l:'Today',v:todayCount,i:'📅',c:'#60A5FA'},{l:'Active',v:activeCount,i:'🔥',c:'#F97316'},{l:'New',v:orders.filter(o=>o.status==='new').length,i:'🆕',c:'#DC2626'},{l:'Done',v:orders.filter(o=>o.status==='delivered').length,i:'✅',c:'#4ADE80'},{l:'Revenue',v:fmt(revenue),i:'💰',c:'#FBBF24'}].map(s=>(
           <div key={s.l} style={{background:'#120600',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'0.75rem',padding:'0.75rem'}}>
             <p style={{color:'rgba(255,255,255,0.4)',fontSize:'0.625rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em'}}>{s.i} {s.l}</p>
             <p style={{color:s.c,fontWeight:900,fontSize:'1.25rem',lineHeight:1.2,marginTop:'0.2rem'}}>{s.v}</p>
@@ -244,7 +438,6 @@ function OrdersPanel({orders,loading,onStatusChange,onDelete,onNotify,onRefresh,
         ))}
       </div>
 
-      {/* Filters */}
       <div style={{display:'flex',gap:'0.375rem',flexWrap:'wrap',marginBottom:'0.875rem',alignItems:'center'}}>
         {(['all','new','confirmed','preparing','ready','delivered','cancelled'] as const).map(s=>(
           <button key={s} onClick={()=>setFilter(s)} style={{padding:'0.3rem 0.75rem',borderRadius:'9999px',fontSize:'0.75rem',fontWeight:700,border:'1px solid transparent',cursor:'pointer',whiteSpace:'nowrap',
@@ -267,7 +460,6 @@ function OrdersPanel({orders,loading,onStatusChange,onDelete,onNotify,onRefresh,
             const cfg=STATUS[order.status]; const isExp=expanded===order.id
             return (
               <div key={order.id} style={{background:'#120600',border:`1px solid ${order.status==='new'?'rgba(96,165,250,0.35)':'rgba(255,255,255,0.07)'}`,borderRadius:'0.875rem',overflow:'hidden'}}>
-                {/* Row header */}
                 <div style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.75rem 0.875rem',cursor:'pointer',flexWrap:'wrap'}} onClick={()=>setExpanded(isExp?null:order.id)}>
                   <span style={{background:cfg.bg,color:cfg.color,fontSize:'0.625rem',fontWeight:800,padding:'0.2rem 0.5rem',borderRadius:'9999px',whiteSpace:'nowrap'}}>{cfg.label}</span>
                   <span style={{color:'#fff',fontWeight:800,fontSize:'0.8125rem',fontFamily:'monospace'}}>{order.id}</span>
@@ -276,10 +468,8 @@ function OrdersPanel({orders,loading,onStatusChange,onDelete,onNotify,onRefresh,
                   <span style={{color:'rgba(255,255,255,0.3)',fontSize:'0.6875rem',whiteSpace:'nowrap'}}>{timeAgo(order.created_at)}</span>
                   <span style={{color:'rgba(255,255,255,0.3)',fontSize:'0.75rem'}}>{isExp?'▲':'▼'}</span>
                 </div>
-
                 {isExp&&(
                   <div style={{borderTop:'1px solid rgba(255,255,255,0.06)',padding:'0.875rem'}}>
-                    {/* Items list */}
                     <div style={{marginBottom:'0.75rem',background:'rgba(255,255,255,0.02)',borderRadius:'0.625rem',padding:'0.625rem'}}>
                       {(order.items as any[]).map((item:any,i:number)=>(
                         <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'0.25rem 0',borderBottom:i<order.items.length-1?'1px solid rgba(255,255,255,0.04)':'none'}}>
@@ -292,13 +482,9 @@ function OrdersPanel({orders,loading,onStatusChange,onDelete,onNotify,onRefresh,
                         <span style={{color:'#FBBF24',fontWeight:900,fontSize:'1rem'}}>{fmt(order.total)}</span>
                       </div>
                     </div>
-
-                    {/* Meta info */}
                     {order.customer_phone&&<p style={{color:'#25D366',fontSize:'0.8125rem',marginBottom:'0.375rem'}}>📞 {order.customer_phone}</p>}
                     {order.note&&<p style={{color:'rgba(255,255,255,0.6)',fontSize:'0.8125rem',marginBottom:'0.375rem'}}>📝 {order.note}</p>}
                     {order.address&&<p style={{color:'rgba(255,255,255,0.6)',fontSize:'0.8125rem',marginBottom:'0.75rem'}}>📍 {order.address}</p>}
-
-                    {/* Actions */}
                     <div style={{display:'flex',gap:'0.375rem',flexWrap:'wrap',alignItems:'center'}}>
                       {cfg.next&&<button onClick={()=>onStatusChange(order.id,cfg.next!)} style={{...BP,fontSize:'0.75rem',padding:'0.4375rem 0.875rem'}}>→ {STATUS[cfg.next].label}</button>}
                       {!['delivered','cancelled'].includes(order.status)&&<button onClick={()=>onStatusChange(order.id,'cancelled')} style={{background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#F87171',padding:'0.4375rem 0.875rem',borderRadius:'9999px',cursor:'pointer',fontSize:'0.75rem',fontWeight:700}}>Cancel</button>}
@@ -318,18 +504,17 @@ function OrdersPanel({orders,loading,onStatusChange,onDelete,onNotify,onRefresh,
 }
 
 // ══════════════════════════════════════════════
-// MENU PANEL — with inline price edit + image preview
+// MENU PANEL
 // ══════════════════════════════════════════════
 function MenuPanel({items,loading,onRefresh,showToast}:{items:MenuItem[];loading:boolean;onRefresh:()=>void;showToast:(m:string)=>void}) {
-  const [search,setSearch]       = useState('')
-  const [catF,setCatF]           = useState('All')
-  const [editing,setEditing]     = useState<Omit<MenuItem,'updated_at'>|null>(null)
-  const [preview,setPreview]     = useState<{src:string;name:string}|null>(null)
-  // inline price edit state: { [itemId]: draftPrice }
-  const [prices,setPrices]       = useState<Record<string,string>>({})
-  const [savingP,setSavingP]     = useState<Record<string,boolean>>({})
+  const [search,setSearch]   = useState('')
+  const [catF,setCatF]       = useState('All')
+  const [editing,setEditing] = useState<Omit<MenuItem,'updated_at'>|null>(null)
+  const [preview,setPreview] = useState<{src:string;name:string}|null>(null)
+  const [prices,setPrices]   = useState<Record<string,string>>({})
+  const [savingP,setSavingP] = useState<Record<string,boolean>>({})
 
-  const filtered = items.filter((i:MenuItem)=>(catF==='All'||i.category===catF)&&i.name.toLowerCase().includes(search.toLowerCase()))
+  const filtered = items.filter(i=>(catF==='All'||i.category===catF)&&i.name.toLowerCase().includes(search.toLowerCase()))
 
   const handleDelete = async(id:string,name:string) => {
     if(!confirm(`Delete "${name}"?`))return
@@ -337,209 +522,110 @@ function MenuPanel({items,loading,onRefresh,showToast}:{items:MenuItem[];loading
     catch(e:any){showToast('❌ '+e.message)}
   }
 
-  // Save inline price change
   const savePrice = async(item:MenuItem) => {
-    const raw = prices[item.id]
-    if(raw===undefined) return
-    const newPrice = parseInt(raw.replace(/[^\d]/g,''),10)
-    if(isNaN(newPrice)||newPrice<=0){showToast('❌ Invalid price');return}
-    setSavingP(p=>({...p,[item.id]:true}))
-    try{
-      await upsertItem({...item,price:newPrice})
-      showToast(`✅ ${item.name} → ${fmt(newPrice)}`)
-      onRefresh()
-      setPrices(p=>{const n={...p};delete n[item.id];return n})
-    }catch(e:any){showToast('❌ '+e.message)}
-    setSavingP(p=>({...p,[item.id]:false}))
+    const raw=prices[item.id]; if(raw===undefined)return
+    const p=parseInt(raw.replace(/[^\d]/g,''),10)
+    if(isNaN(p)||p<=0){showToast('❌ Invalid price');return}
+    setSavingP(s=>({...s,[item.id]:true}))
+    try{await upsertItem({...item,price:p});showToast(`✅ ${item.name} → ${fmt(p)}`);onRefresh();setPrices(s=>{const n={...s};delete n[item.id];return n})}
+    catch(e:any){showToast('❌ '+e.message)}
+    setSavingP(s=>({...s,[item.id]:false}))
   }
 
   return (
     <div>
-      {/* Category summary */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:'0.625rem',marginBottom:'1rem'}}>
         {CATS.map(c=>(
-          <div key={c} style={{background:'#120600',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'0.75rem',padding:'0.75rem',cursor:'pointer'}} onClick={()=>setCatF(c==='All'?'All':c)}>
+          <div key={c} style={{background:'#120600',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'0.75rem',padding:'0.75rem',cursor:'pointer'}} onClick={()=>setCatF(c)}>
             <p style={{color:'rgba(255,255,255,0.35)',fontSize:'0.625rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',lineHeight:1.3}}>{c}</p>
-            <p style={{color:'#F97316',fontWeight:900,fontSize:'1.375rem',lineHeight:1.2,marginTop:'0.2rem'}}>{items.filter((i:MenuItem)=>i.category===c).length}</p>
+            <p style={{color:'#F97316',fontWeight:900,fontSize:'1.375rem',lineHeight:1.2,marginTop:'0.2rem'}}>{items.filter(i=>i.category===c).length}</p>
           </div>
         ))}
       </div>
 
-      {/* Controls */}
       <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',marginBottom:'0.875rem',alignItems:'center'}}>
         <input type="search" placeholder="🔍 Search items…" value={search} onChange={e=>setSearch(e.target.value)} style={{...IS,maxWidth:'200px',padding:'0.5rem 0.75rem',fontSize:'0.8125rem'}} />
-        <div style={{display:'flex',gap:'0.375rem',flexWrap:'wrap'}}>
-          {['All',...CATS].map(c=>(
-            <button key={c} onClick={()=>setCatF(c)} style={{padding:'0.3rem 0.75rem',borderRadius:'9999px',fontSize:'0.75rem',fontWeight:700,border:'1px solid transparent',cursor:'pointer',
-              background:catF===c?'linear-gradient(135deg,#F97316,#DC2626)':'rgba(255,255,255,0.04)',
-              color:catF===c?'#fff':'rgba(255,255,255,0.5)'}}>
-              {c==='All'?`All (${items.length})`:c}
-            </button>
-          ))}
-        </div>
-        <button onClick={()=>setEditing({...EMPTY,id:slug(Date.now().toString()),sort_order:items.length+1})} style={{...BP,fontSize:'0.8125rem',padding:'0.5rem 1rem',marginLeft:'auto'}}>+ Add Item</button>
+        {['All',...CATS].map(c=>(
+          <button key={c} onClick={()=>setCatF(c)} style={{padding:'0.3rem 0.75rem',borderRadius:'9999px',fontSize:'0.75rem',fontWeight:700,border:'1px solid transparent',cursor:'pointer',
+            background:catF===c?'linear-gradient(135deg,#F97316,#DC2626)':'rgba(255,255,255,0.04)',
+            color:catF===c?'#fff':'rgba(255,255,255,0.5)'}}>{c==='All'?`All (${items.length})`:c}</button>
+        ))}
+        <button onClick={()=>setEditing({...EMPTY,id:'new-'+Date.now().toString(36),sort_order:items.length+1})} style={{...BP,fontSize:'0.8125rem',padding:'0.5rem 1rem',marginLeft:'auto'}}>+ Add Item</button>
       </div>
 
       {loading?<Loader text="Loading menu…"/>:(
-        <>
-          {/* ── MOBILE CARD VIEW ── */}
-          <div className="mobile-cards" style={{display:'none'}}>
-            {filtered.map((item:MenuItem)=>(
-              <MobileMenuCard
-                key={item.id} item={item}
-                priceVal={prices[item.id]??String(item.price)}
-                onPriceChange={v=>setPrices(p=>({...p,[item.id]:v}))}
-                onSavePrice={()=>savePrice(item)}
-                saving={!!savingP[item.id]}
-                onEdit={()=>setEditing({...item})}
-                onDelete={()=>handleDelete(item.id,item.name)}
-                onPreview={()=>setPreview({src:item.img_url,name:item.name})}
-              />
-            ))}
-          </div>
-
-          {/* ── DESKTOP TABLE VIEW ── */}
-          <div className="desktop-table" style={{background:'#120600',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'1rem',overflow:'auto'}}>
-            <table style={{width:'100%',borderCollapse:'collapse',minWidth:'680px'}}>
-              <thead>
-                <tr style={{background:'rgba(255,255,255,0.03)',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
-                  {['Image','Name / ID','Category','Price','Badge','Actions'].map((h,i)=>(
-                    <th key={i} style={{padding:'0.75rem 1rem',textAlign:'left',color:'rgba(255,255,255,0.35)',fontSize:'0.625rem',fontWeight:800,textTransform:'uppercase',letterSpacing:'0.08em',whiteSpace:'nowrap'}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((item:MenuItem)=>(
-                  <tr key={item.id} style={{borderBottom:'1px solid rgba(255,255,255,0.05)',transition:'background 0.15s'}}
-                    onMouseEnter={e=>(e.currentTarget.style.background='rgba(249,115,22,0.04)')}
-                    onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-
-                    {/* Image — clickable preview */}
-                    <td style={{padding:'0.625rem 1rem'}}>
-                      <div style={{position:'relative',width:'52px',height:'52px',cursor:'pointer'}} onClick={()=>setPreview({src:item.img_url,name:item.name})}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={item.img_url} alt="" style={{width:'52px',height:'52px',objectFit:'cover',borderRadius:'0.5rem',border:'1px solid rgba(255,255,255,0.1)',display:'block'}} onError={e=>{(e.target as HTMLImageElement).src='https://placehold.co/52x52/1A0800/F97316?text=?'}} />
-                        <div style={{position:'absolute',inset:0,borderRadius:'0.5rem',background:'rgba(0,0,0,0)',display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.2s'}}
-                          onMouseEnter={e=>(e.currentTarget.style.background='rgba(0,0,0,0.45)')}
-                          onMouseLeave={e=>(e.currentTarget.style.background='rgba(0,0,0,0)')}>
-                          <span style={{color:'#fff',fontSize:'0.875rem',opacity:0}} className="preview-eye">👁</span>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Name */}
-                    <td style={{padding:'0.625rem 1rem'}}>
-                      <p style={{color:'#fff',fontWeight:700,fontSize:'0.875rem',maxWidth:'160px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.name}</p>
-                      <p style={{color:'rgba(255,255,255,0.25)',fontSize:'0.6875rem'}}>{item.id}</p>
-                    </td>
-
-                    {/* Category */}
-                    <td style={{padding:'0.625rem 1rem',color:'rgba(255,255,255,0.5)',fontSize:'0.8125rem',whiteSpace:'nowrap'}}>
-                      {item.category}
-                      {item.subcat&&<span style={{color:'#F97316',display:'block',fontSize:'0.6875rem'}}>{item.subcat}</span>}
-                    </td>
-
-                    {/* ── INLINE PRICE EDIT ── */}
-                    <td style={{padding:'0.625rem 1rem'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:'0.375rem'}}>
-                        <span style={{color:'rgba(255,255,255,0.35)',fontSize:'0.75rem'}}>₦</span>
-                        <input
-                          type="number"
-                          value={prices[item.id]??item.price}
-                          onChange={e=>setPrices(p=>({...p,[item.id]:e.target.value}))}
-                          style={{width:'90px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'#FBBF24',borderRadius:'0.5rem',padding:'0.3125rem 0.5rem',fontSize:'0.875rem',fontWeight:800,outline:'none',fontFamily:'monospace'}}
-                          onFocus={e=>(e.target.style.borderColor='rgba(249,115,22,0.6)')}
-                          onBlur={e=>(e.target.style.borderColor='rgba(255,255,255,0.1)')}
-                        />
-                        {prices[item.id]!==undefined&&String(prices[item.id])!==String(item.price)&&(
-                          <button onClick={()=>savePrice(item)} disabled={!!savingP[item.id]}
-                            style={{background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.3)',color:'#4ADE80',borderRadius:'0.375rem',padding:'0.25rem 0.5rem',cursor:'pointer',fontSize:'0.6875rem',fontWeight:800,whiteSpace:'nowrap'}}>
-                            {savingP[item.id]?'…':'Save ✓'}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Badge */}
-                    <td style={{padding:'0.625rem 1rem'}}>
-                      {item.badge&&<span style={{background:item.badge_color||'#F97316',color:'#fff',fontSize:'0.5625rem',fontWeight:800,padding:'0.2rem 0.5rem',borderRadius:'9999px',textTransform:'uppercase'}}>{item.badge}</span>}
-                    </td>
-
-                    {/* Actions */}
-                    <td style={{padding:'0.625rem 1rem'}}>
-                      <div style={{display:'flex',gap:'0.375rem',alignItems:'center'}}>
-                        <button onClick={()=>setPreview({src:item.img_url,name:item.name})} title="Preview image" style={{padding:'0.3rem 0.5rem',borderRadius:'0.375rem',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:'0.75rem'}}>👁</button>
-                        <button onClick={()=>setEditing({...item})} style={{padding:'0.3rem 0.625rem',borderRadius:'0.375rem',background:'rgba(249,115,22,0.1)',border:'1px solid rgba(249,115,22,0.2)',color:'#F97316',cursor:'pointer',fontSize:'0.75rem',fontWeight:700}}>✏️</button>
-                        <button onClick={()=>handleDelete(item.id,item.name)} style={{padding:'0.3rem 0.625rem',borderRadius:'0.375rem',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.15)',color:'#F87171',cursor:'pointer',fontSize:'0.75rem',fontWeight:700}}>🗑</button>
-                      </div>
-                    </td>
-                  </tr>
+        <div style={{background:'#120600',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'1rem',overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',minWidth:'680px'}}>
+            <thead>
+              <tr style={{background:'rgba(255,255,255,0.03)',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+                {['Image','Name / ID','Category','Price','Badge','Actions'].map((h,i)=>(
+                  <th key={i} style={{padding:'0.75rem 1rem',textAlign:'left',color:'rgba(255,255,255,0.35)',fontSize:'0.625rem',fontWeight:800,textTransform:'uppercase',letterSpacing:'0.08em',whiteSpace:'nowrap'}}>{h}</th>
                 ))}
-                {filtered.length===0&&<tr><td colSpan={6} style={{padding:'2.5rem',textAlign:'center',color:'rgba(255,255,255,0.3)',fontSize:'0.875rem'}}>No items found</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((item:MenuItem)=>(
+                <tr key={item.id} style={{borderBottom:'1px solid rgba(255,255,255,0.05)',transition:'background 0.15s'}}
+                  onMouseEnter={e=>(e.currentTarget.style.background='rgba(249,115,22,0.04)')}
+                  onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
+                  <td style={{padding:'0.625rem 1rem'}}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.img_url} alt="" style={{width:'52px',height:'52px',objectFit:'cover',borderRadius:'0.5rem',border:'1px solid rgba(255,255,255,0.1)',cursor:'pointer'}}
+                      onClick={()=>setPreview({src:item.img_url,name:item.name})}
+                      onError={e=>{(e.target as HTMLImageElement).src='https://placehold.co/52x52/1A0800/F97316?text=?'}} />
+                  </td>
+                  <td style={{padding:'0.625rem 1rem'}}>
+                    <p style={{color:'#fff',fontWeight:700,fontSize:'0.875rem',maxWidth:'160px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.name}</p>
+                    <p style={{color:'rgba(255,255,255,0.25)',fontSize:'0.6875rem'}}>{item.id}</p>
+                  </td>
+                  <td style={{padding:'0.625rem 1rem',color:'rgba(255,255,255,0.5)',fontSize:'0.8125rem',whiteSpace:'nowrap'}}>
+                    {item.category}{item.subcat&&<span style={{color:'#F97316',display:'block',fontSize:'0.6875rem'}}>{item.subcat}</span>}
+                  </td>
+                  <td style={{padding:'0.625rem 1rem'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:'0.375rem'}}>
+                      <span style={{color:'rgba(255,255,255,0.35)',fontSize:'0.75rem'}}>₦</span>
+                      <input type="number" value={prices[item.id]??item.price} onChange={e=>setPrices(p=>({...p,[item.id]:e.target.value}))}
+                        style={{width:'90px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'#FBBF24',borderRadius:'0.5rem',padding:'0.3125rem 0.5rem',fontSize:'0.875rem',fontWeight:800,outline:'none',fontFamily:'monospace'}}
+                        onFocus={e=>(e.target.style.borderColor='rgba(249,115,22,0.6)')}
+                        onBlur={e=>(e.target.style.borderColor='rgba(255,255,255,0.1)')} />
+                      {prices[item.id]!==undefined&&String(prices[item.id])!==String(item.price)&&(
+                        <button onClick={()=>savePrice(item)} disabled={!!savingP[item.id]}
+                          style={{background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.3)',color:'#4ADE80',borderRadius:'0.375rem',padding:'0.25rem 0.5rem',cursor:'pointer',fontSize:'0.6875rem',fontWeight:800,whiteSpace:'nowrap'}}>
+                          {savingP[item.id]?'…':'Save ✓'}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                  <td style={{padding:'0.625rem 1rem'}}>
+                    {item.badge&&<span style={{background:item.badge_color||'#F97316',color:'#fff',fontSize:'0.5625rem',fontWeight:800,padding:'0.2rem 0.5rem',borderRadius:'9999px',textTransform:'uppercase'}}>{item.badge}</span>}
+                  </td>
+                  <td style={{padding:'0.625rem 1rem'}}>
+                    <div style={{display:'flex',gap:'0.375rem',alignItems:'center'}}>
+                      <button onClick={()=>setPreview({src:item.img_url,name:item.name})} style={{padding:'0.3rem 0.5rem',borderRadius:'0.375rem',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:'0.75rem'}}>👁</button>
+                      <button onClick={()=>setEditing({...item})} style={{padding:'0.3rem 0.625rem',borderRadius:'0.375rem',background:'rgba(249,115,22,0.1)',border:'1px solid rgba(249,115,22,0.2)',color:'#F97316',cursor:'pointer',fontSize:'0.75rem',fontWeight:700}}>✏️</button>
+                      <button onClick={()=>handleDelete(item.id,item.name)} style={{padding:'0.3rem 0.625rem',borderRadius:'0.375rem',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.15)',color:'#F87171',cursor:'pointer',fontSize:'0.75rem',fontWeight:700}}>🗑</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length===0&&<tr><td colSpan={6} style={{padding:'2.5rem',textAlign:'center',color:'rgba(255,255,255,0.3)',fontSize:'0.875rem'}}>No items found</td></tr>}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {editing&&<EditModal item={editing} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);onRefresh();showToast('✅ Saved!')}} />}
 
-      {/* IMAGE PREVIEW MODAL */}
       {preview&&(
-        <>
-          <div onClick={()=>setPreview(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.9)',zIndex:400,backdropFilter:'blur(8px)',display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem'}} >
-            <div style={{position:'relative',maxWidth:'min(600px,calc(100vw - 3rem))',width:'100%'}} onClick={e=>e.stopPropagation()}>
-              <button onClick={()=>setPreview(null)} style={{position:'absolute',top:'-2.5rem',right:0,background:'rgba(255,255,255,0.1)',border:'none',color:'#fff',width:'32px',height:'32px',borderRadius:'50%',cursor:'pointer',fontSize:'1.125rem',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={preview.src} alt={preview.name} style={{width:'100%',borderRadius:'1rem',border:'1px solid rgba(255,255,255,0.1)',display:'block',maxHeight:'70vh',objectFit:'contain'}} onError={e=>{(e.target as HTMLImageElement).src='https://placehold.co/600x400/1A0800/F97316?text=Image+Not+Found'}} />
-              <p style={{color:'rgba(255,255,255,0.7)',textAlign:'center',marginTop:'0.75rem',fontWeight:700,fontSize:'0.9375rem'}}>{preview.name}</p>
-              <p style={{color:'rgba(255,255,255,0.3)',textAlign:'center',fontSize:'0.75rem',marginTop:'0.25rem',wordBreak:'break-all'}}>{preview.src}</p>
-            </div>
+        <div onClick={()=>setPreview(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.9)',zIndex:400,backdropFilter:'blur(8px)',display:'flex',alignItems:'center',justifyContent:'center',padding:'1.5rem'}}>
+          <div style={{position:'relative',maxWidth:'min(600px,calc(100vw - 3rem))',width:'100%'}} onClick={e=>e.stopPropagation()}>
+            <button onClick={()=>setPreview(null)} style={{position:'absolute',top:'-2.5rem',right:0,background:'rgba(255,255,255,0.1)',border:'none',color:'#fff',width:'32px',height:'32px',borderRadius:'50%',cursor:'pointer',fontSize:'1.125rem',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={preview.src} alt={preview.name} style={{width:'100%',borderRadius:'1rem',border:'1px solid rgba(255,255,255,0.1)',display:'block',maxHeight:'70vh',objectFit:'contain'}} onError={e=>{(e.target as HTMLImageElement).src='https://placehold.co/600x400/1A0800/F97316?text=Image+Not+Found'}} />
+            <p style={{color:'rgba(255,255,255,0.7)',textAlign:'center',marginTop:'0.75rem',fontWeight:700}}>{preview.name}</p>
           </div>
-        </>
+        </div>
       )}
-
-      <style>{`
-        .preview-eye{opacity:0!important}
-        tr:hover .preview-eye{opacity:1!important}
-        @media(max-width:700px){.mobile-cards{display:flex!important;flex-direction:column;gap:0.625rem}.desktop-table{display:none!important}}
-      `}</style>
-    </div>
-  )
-}
-
-// ── Mobile menu card ──────────────────────────
-function MobileMenuCard({item,priceVal,onPriceChange,onSavePrice,saving,onEdit,onDelete,onPreview}:{
-  item:MenuItem;priceVal:string;onPriceChange:(v:string)=>void;
-  onSavePrice:()=>void;saving:boolean;
-  onEdit:()=>void;onDelete:()=>void;onPreview:()=>void
-}) {
-  const isDirty = priceVal!==String(item.price)
-  return (
-    <div style={{background:'#120600',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'0.875rem',padding:'0.875rem',display:'flex',gap:'0.75rem',alignItems:'flex-start'}}>
-      {/* Image */}
-      <div style={{flexShrink:0,cursor:'pointer'}} onClick={onPreview}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={item.img_url} alt={item.name} style={{width:'60px',height:'60px',objectFit:'cover',borderRadius:'0.625rem',border:'1px solid rgba(255,255,255,0.1)'}} onError={e=>{(e.target as HTMLImageElement).src='https://placehold.co/60x60/1A0800/F97316?text=?'}} />
-      </div>
-      {/* Info */}
-      <div style={{flex:1,minWidth:0}}>
-        <p style={{color:'#fff',fontWeight:700,fontSize:'0.9rem',marginBottom:'0.125rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.name}</p>
-        <p style={{color:'rgba(255,255,255,0.35)',fontSize:'0.6875rem',marginBottom:'0.5rem'}}>{item.category}{item.subcat?` · ${item.subcat}`:''}</p>
-        {/* Inline price */}
-        <div style={{display:'flex',alignItems:'center',gap:'0.375rem',marginBottom:'0.5rem'}}>
-          <span style={{color:'rgba(255,255,255,0.4)',fontSize:'0.75rem'}}>₦</span>
-          <input type="number" value={priceVal} onChange={e=>onPriceChange(e.target.value)}
-            style={{width:'100px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.12)',color:'#FBBF24',borderRadius:'0.5rem',padding:'0.3rem 0.5rem',fontSize:'0.875rem',fontWeight:800,outline:'none',fontFamily:'monospace'}} />
-          {isDirty&&<button onClick={onSavePrice} disabled={saving} style={{background:'rgba(74,222,128,0.15)',border:'1px solid rgba(74,222,128,0.3)',color:'#4ADE80',borderRadius:'0.375rem',padding:'0.25rem 0.5rem',cursor:'pointer',fontSize:'0.6875rem',fontWeight:800}}>{saving?'…':'Save ✓'}</button>}
-        </div>
-        {/* Actions */}
-        <div style={{display:'flex',gap:'0.375rem'}}>
-          <button onClick={onPreview} style={{padding:'0.3rem 0.625rem',borderRadius:'0.375rem',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:'0.75rem'}}>👁 View</button>
-          <button onClick={onEdit} style={{padding:'0.3rem 0.625rem',borderRadius:'0.375rem',background:'rgba(249,115,22,0.1)',border:'1px solid rgba(249,115,22,0.2)',color:'#F97316',cursor:'pointer',fontSize:'0.75rem',fontWeight:700}}>✏️ Edit</button>
-          <button onClick={onDelete} style={{padding:'0.3rem 0.625rem',borderRadius:'0.375rem',background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.15)',color:'#F87171',cursor:'pointer',fontSize:'0.75rem',fontWeight:700}}>🗑</button>
-        </div>
-      </div>
     </div>
   )
 }
@@ -547,22 +633,34 @@ function MobileMenuCard({item,priceVal,onPriceChange,onSavePrice,saving,onEdit,o
 // ══════════════════════════════════════════════
 // STATS PANEL
 // ══════════════════════════════════════════════
-function StatsPanel({orders,menuItems}:{orders:Order[];menuItems:MenuItem[]}) {
-  const topItems = orders.flatMap((o:Order)=>o.items as any[]).reduce((acc:Record<string,any>,item:any)=>{
+function StatsPanel({orders,menuItems,inbox}:{orders:Order[];menuItems:MenuItem[];inbox:any[]}) {
+  const topItems = orders.flatMap(o=>o.items as any[]).reduce((acc:Record<string,any>,item:any)=>{
     if(!acc[item.id])acc[item.id]={name:item.name,qty:0,revenue:0}
-    acc[item.id].qty+=item.qty;acc[item.id].revenue+=item.price*item.qty
-    return acc
+    acc[item.id].qty+=item.qty;acc[item.id].revenue+=item.price*item.qty;return acc
   },{})
-  const topList = Object.values(topItems).sort((a:any,b:any)=>b.qty-a.qty).slice(0,8)
+  const topList=Object.values(topItems).sort((a:any,b:any)=>b.qty-a.qty).slice(0,8)
 
   return (
     <div style={{display:'flex',flexDirection:'column',gap:'1.5rem'}}>
+      {/* Inbox summary */}
+      <div>
+        <h3 style={{color:'#fff',fontWeight:700,fontSize:'0.9375rem',marginBottom:'0.75rem'}}>Submission Summary</h3>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:'0.625rem'}}>
+          {[{l:'Messages',v:inbox.filter(i=>i._type==='contact').length,c:'#60A5FA',i:'💬'},{l:'Reviews',v:inbox.filter(i=>i._type==='review').length,c:'#FBBF24',i:'⭐'},{l:'Catering',v:inbox.filter(i=>i._type==='catering').length,c:'#A78BFA',i:'🎉'}].map(s=>(
+            <div key={s.l} style={{background:'#120600',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'0.875rem',padding:'0.875rem'}}>
+              <p style={{color:'rgba(255,255,255,0.35)',fontSize:'0.625rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em'}}>{s.i} {s.l}</p>
+              <p style={{color:s.c,fontWeight:900,fontSize:'1.875rem',lineHeight:1,marginTop:'0.25rem'}}>{s.v}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Order status */}
       <div>
         <h3 style={{color:'#fff',fontWeight:700,fontSize:'0.9375rem',marginBottom:'0.75rem'}}>Orders by Status</h3>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:'0.625rem'}}>
           {(Object.entries(STATUS) as [OrderStatus, typeof STATUS[OrderStatus]][]).map(([k,v])=>(
             <div key={k} style={{background:v.bg,border:`1px solid ${v.color}25`,borderRadius:'0.875rem',padding:'0.875rem'}}>
-              <p style={{color:v.color,fontWeight:900,fontSize:'1.875rem',lineHeight:1}}>{orders.filter((o:Order)=>o.status===k).length}</p>
+              <p style={{color:v.color,fontWeight:900,fontSize:'1.875rem',lineHeight:1}}>{orders.filter(o=>o.status===k).length}</p>
               <p style={{color:v.color,fontSize:'0.75rem',fontWeight:700,marginTop:'0.25rem'}}>{v.label}</p>
             </div>
           ))}
@@ -588,7 +686,7 @@ function StatsPanel({orders,menuItems}:{orders:Order[];menuItems:MenuItem[]}) {
 }
 
 // ══════════════════════════════════════════════
-// EDIT MODAL (full item edit)
+// EDIT MODAL
 // ══════════════════════════════════════════════
 function EditModal({item,onClose,onSaved}:{item:Omit<MenuItem,'updated_at'>;onClose:()=>void;onSaved:()=>void}) {
   const [form,setForm]   = useState({...item})
@@ -627,18 +725,13 @@ function EditModal({item,onClose,onSaved}:{item:Omit<MenuItem,'updated_at'>;onCl
           <h2 style={{color:'#fff',fontFamily:'Georgia,serif',fontSize:'clamp(1rem,3vw,1.25rem)',fontWeight:700}}>{item.name?`Edit: ${item.name}`:'New Item'}</h2>
           <button onClick={onClose} style={{background:'rgba(255,255,255,0.07)',border:'none',color:'#fff',width:'32px',height:'32px',borderRadius:'50%',cursor:'pointer',fontSize:'1.125rem',flexShrink:0}}>×</button>
         </div>
-
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'0.875rem'}}>
           <F label="Item ID *"><input value={form.id} onChange={e=>set('id',e.target.value)} style={IS} placeholder="s15" /></F>
           <F label="Sort Order"><input type="number" value={form.sort_order} onChange={e=>set('sort_order',+e.target.value)} style={IS} /></F>
           <F label="Name *" span><input value={form.name} onChange={e=>set('name',e.target.value)} style={IS} /></F>
           <F label="Price (₦) *"><input type="number" value={form.price||''} onChange={e=>set('price',+e.target.value)} style={IS} placeholder="35000" /></F>
-          <F label="Category *">
-            <select value={form.category} onChange={e=>set('category',e.target.value)} style={IS}>{CATS.map(c=><option key={c}>{c}</option>)}</select>
-          </F>
-          <F label="Sub-category">
-            <select value={form.subcat||''} onChange={e=>set('subcat',e.target.value)} style={IS}>{SUBCATS.map(s=><option key={s} value={s}>{s||'— None —'}</option>)}</select>
-          </F>
+          <F label="Category *"><select value={form.category} onChange={e=>set('category',e.target.value)} style={IS}>{CATS.map(c=><option key={c}>{c}</option>)}</select></F>
+          <F label="Sub-category"><select value={form.subcat||''} onChange={e=>set('subcat',e.target.value)} style={IS}>{SUBCATS.map(s=><option key={s} value={s}>{s||'— None —'}</option>)}</select></F>
           <F label="Description *" span><textarea value={form.description} onChange={e=>set('description',e.target.value)} style={{...IS,minHeight:'68px',resize:'vertical'}} /></F>
           <F label="Badge"><input value={form.badge||''} onChange={e=>set('badge',e.target.value)} style={IS} placeholder="2L Bowl" /></F>
           <F label="Badge Colour">
@@ -648,12 +741,10 @@ function EditModal({item,onClose,onSaved}:{item:Omit<MenuItem,'updated_at'>;onCl
             </div>
           </F>
           <F label="Note" span><input value={form.note||''} onChange={e=>set('note',e.target.value)} style={IS} placeholder="Includes 5pcs…" /></F>
-
-          {/* Main image */}
           <F label="Main Image *" span>
             <div style={{display:'flex',gap:'0.75rem',alignItems:'flex-start'}}>
               <div style={{flex:1}}>
-                <input value={form.img_url||''} onChange={e=>set('img_url',e.target.value)} style={{...IS,marginBottom:'0.5rem'}} placeholder="/soup/egusi.jpg or https://…" />
+                <input value={form.img_url||''} onChange={e=>set('img_url',e.target.value)} style={{...IS,marginBottom:'0.5rem'}} placeholder="/images/egusi.jpg or https://…" />
                 <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
                   <input ref={r1} type="file" accept="image/*" style={{display:'none'}} onChange={e=>e.target.files?.[0]&&handleUpload(e.target.files[0],'img_url')} />
                   <button onClick={()=>r1.current?.click()} disabled={upImg} style={{...BS,fontSize:'0.8rem',padding:'0.375rem 0.75rem',opacity:upImg?0.7:1}}>{upImg?'⏳ Uploading…':'📁 Upload'}</button>
@@ -662,12 +753,10 @@ function EditModal({item,onClose,onSaved}:{item:Omit<MenuItem,'updated_at'>;onCl
               {form.img_url&&<img src={form.img_url} alt="p" style={{width:'72px',height:'72px',objectFit:'cover',borderRadius:'0.625rem',border:'1px solid rgba(255,255,255,0.1)',flexShrink:0}} onError={e=>{(e.target as HTMLImageElement).style.display='none'}} />}
             </div>
           </F>
-
-          {/* Second image */}
           <F label="Second Image" hint="optional — auto-crossfades" span>
             <div style={{display:'flex',gap:'0.75rem',alignItems:'flex-start'}}>
               <div style={{flex:1}}>
-                <input value={form.img2_url||''} onChange={e=>set('img2_url',e.target.value)} style={{...IS,marginBottom:'0.5rem'}} placeholder="/soup/oha-2.jpg (optional)" />
+                <input value={form.img2_url||''} onChange={e=>set('img2_url',e.target.value)} style={{...IS,marginBottom:'0.5rem'}} placeholder="optional second image" />
                 <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap'}}>
                   <input ref={r2} type="file" accept="image/*" style={{display:'none'}} onChange={e=>e.target.files?.[0]&&handleUpload(e.target.files[0],'img2_url')} />
                   <button onClick={()=>r2.current?.click()} disabled={upImg2} style={{...BS,fontSize:'0.8rem',padding:'0.375rem 0.75rem',opacity:upImg2?0.7:1}}>{upImg2?'⏳ Uploading…':'📁 Upload'}</button>
@@ -678,9 +767,7 @@ function EditModal({item,onClose,onSaved}:{item:Omit<MenuItem,'updated_at'>;onCl
             </div>
           </F>
         </div>
-
         {err&&<p style={{color:'#F87171',fontSize:'0.875rem',marginTop:'1rem',textAlign:'center'}}>{err}</p>}
-
         <div style={{display:'flex',gap:'0.75rem',marginTop:'1.25rem',justifyContent:'flex-end',flexWrap:'wrap'}}>
           <button onClick={onClose} style={{...BS,padding:'0.75rem 1.5rem'}}>Cancel</button>
           <button onClick={save} disabled={saving} style={{...BP,padding:'0.75rem 1.75rem',opacity:saving?0.7:1}}>{saving?'Saving…':'💾 Save Item'}</button>
@@ -690,7 +777,6 @@ function EditModal({item,onClose,onSaved}:{item:Omit<MenuItem,'updated_at'>;onCl
   )
 }
 
-// ── Tiny helpers ──────────────────────────────
 function F({label,children,hint,span}:{label:string;children:React.ReactNode;hint?:string;span?:boolean}) {
   return (
     <div style={{gridColumn:span?'1 / -1':undefined}}>
@@ -712,7 +798,7 @@ function Loader({text,fullPage}:{text:string;fullPage?:boolean}) {
   )
 }
 
-// ── Shared style tokens ───────────────────────
-const IS: React.CSSProperties = {width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',borderRadius:'0.625rem',padding:'0.625rem 0.875rem',fontSize:'0.9rem',outline:'none',fontFamily:'system-ui,sans-serif',boxSizing:'border-box'}
-const BP: React.CSSProperties = {background:'linear-gradient(135deg,#F97316,#DC2626)',color:'#fff',fontWeight:800,fontSize:'0.9375rem',padding:'0.8125rem 1.75rem',borderRadius:'9999px',border:'none',cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center',gap:'0.4rem'}
-const BS: React.CSSProperties = {background:'rgba(255,255,255,0.06)',color:'#fff',fontWeight:700,fontSize:'0.9375rem',padding:'0.8125rem 1.75rem',borderRadius:'9999px',border:'1px solid rgba(255,255,255,0.12)',cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}
+const LBL: React.CSSProperties = {display:'block',color:'rgba(255,255,255,0.5)',fontSize:'0.75rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:'0.375rem'}
+const IS: React.CSSProperties  = {width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',borderRadius:'0.625rem',padding:'0.625rem 0.875rem',fontSize:'0.9rem',outline:'none',fontFamily:'system-ui,sans-serif',boxSizing:'border-box'}
+const BP: React.CSSProperties  = {background:'linear-gradient(135deg,#F97316,#DC2626)',color:'#fff',fontWeight:800,fontSize:'0.9375rem',padding:'0.8125rem 1.75rem',borderRadius:'9999px',border:'none',cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center',gap:'0.4rem'}
+const BS: React.CSSProperties  = {background:'rgba(255,255,255,0.06)',color:'#fff',fontWeight:700,fontSize:'0.9375rem',padding:'0.8125rem 1.75rem',borderRadius:'9999px',border:'1px solid rgba(255,255,255,0.12)',cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}
