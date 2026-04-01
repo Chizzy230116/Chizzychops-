@@ -1,9 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from './supabase-client'
 
-const supabaseUrl  = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-export const supabase = createClient(supabaseUrl, supabaseAnon)
+export { supabase }
 
 // ── Types ──────────────────────────────────────────────────
 export type MenuItem = {
@@ -22,7 +19,9 @@ export type MenuItem = {
   updated_at:  string
 }
 
-export type OrderStatus = 'new' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'cancelled'
+export type OrderStatus =
+  | 'new' | 'confirmed' | 'preparing'
+  | 'ready' | 'delivered' | 'cancelled'
 
 export type OrderItem = {
   id:    string
@@ -32,16 +31,16 @@ export type OrderItem = {
 }
 
 export type Order = {
-  id:              string
-  customer_name:   string | null
-  customer_phone:  string | null
-  items:           OrderItem[]
-  total:           number
-  status:          OrderStatus
-  note:            string | null
-  address:         string | null
-  created_at:      string
-  updated_at:      string
+  id:             string
+  customer_name:  string | null
+  customer_phone: string | null
+  items:          OrderItem[]
+  total:          number
+  status:         OrderStatus
+  note:           string | null
+  address:        string | null
+  created_at:     string
+  updated_at:     string
 }
 
 // ── Menu helpers ───────────────────────────────────────────
@@ -63,9 +62,7 @@ export async function upsertItem(item: Omit<MenuItem, 'updated_at'>): Promise<vo
 
 export async function deleteItem(id: string): Promise<void> {
   const { error } = await supabase
-    .from('menu_items')
-    .delete()
-    .eq('id', id)
+    .from('menu_items').delete().eq('id', id)
   if (error) throw error
 }
 
@@ -89,8 +86,7 @@ export async function createOrder(order: {
       note:           order.note    || null,
       address:        order.address || null,
     }])
-    .select()
-    .single()
+    .select().single()
   if (error) throw error
   return data as Order
 }
@@ -114,9 +110,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus): Promis
 
 export async function deleteOrder(id: string): Promise<void> {
   const { error } = await supabase
-    .from('orders')
-    .delete()
-    .eq('id', id)
+    .from('orders').delete().eq('id', id)
   if (error) throw error
 }
 
@@ -124,16 +118,9 @@ export async function deleteOrder(id: string): Promise<void> {
 export async function uploadImage(file: File): Promise<string> {
   const ext  = file.name.split('.').pop()
   const path = `menu/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-
   const { error } = await supabase.storage
-    .from('food-images')
-    .upload(path, file, { upsert: true })
-
+    .from('food-images').upload(path, file, { upsert: true })
   if (error) throw error
-
-  const { data } = supabase.storage
-    .from('food-images')
-    .getPublicUrl(path)
-
+  const { data } = supabase.storage.from('food-images').getPublicUrl(path)
   return data.publicUrl
 }
