@@ -1,17 +1,12 @@
 'use client'
-export const dynamic = "force-dynamic";
+
+export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useRef } from 'react'
-import { supabase } from '@/app/lib/supabase-client'
 import {
-  fetchMenu,
-  upsertItem,
-  deleteItem,
-  uploadImage,
-  fetchOrders,
-  updateOrderStatus,
-  deleteOrder,
-} from '@/app/lib/supabase-queries'
+  supabase, fetchMenu, upsertItem, deleteItem, uploadImage,
+  fetchOrders, updateOrderStatus, deleteOrder,
+} from '@/app/lib/supabase'
 import type { MenuItem, Order, OrderStatus } from '@/app/lib/supabase'
 
 const OWNER_WA   = '2348094946923'
