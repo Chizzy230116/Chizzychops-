@@ -110,7 +110,7 @@ export default function Hero() {
             opacity: mounted ? 1 : 0, transform: mounted ? 'translateY(0)' : 'translateY(16px)',
             transition: 'opacity 0.7s ease 0.2s, transform 0.7s ease 0.2s',
           }}>
-            Every dish cooked <strong style={{ color: 'rgba(255,255,255,0.9)', letterSpacing: '0.05em' }}>fresh from scratch</strong> in our home kitchen —
+            Every dish cooked <strong style={{ color: 'rgba(255,255,255,0.9)', letterSpacing: '0.05em' }}> fresh from scratch </strong> in our home kitchen —
             soups, grills, pastas &amp; more. Real Nigerian flavour, delivered with love.
           </p>
 
