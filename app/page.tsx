@@ -1,5 +1,6 @@
 'use client'
 
+import Navbar   from '@/app/components/Navbar'
 import Hero    from '@/app/components/Hero'
 import About   from '@/app/components/About'
 import Contact from '@/app/components/Contact'
@@ -11,6 +12,7 @@ import ReviewSystem     from '@/app/components/ReviewSystem'
 export default function HomePage() {
   return (
     <>
+    <Navbar/>
       <Hero />
       <About />
       <ReviewSystem />
