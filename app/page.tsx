@@ -1,27 +1,23 @@
-import Navbar from './components/Navbar'
-import Hero from './components/Hero'
-import About from './components/About'
-import Menu from './components/menu/page'
-import Services from './components/Services'
-import ReviewSystem from './components/ReviewSystem'
-import Contact from './components/Contact'
-import Footer from './components/Footer'
-import FloatingWhatsApp from './components/FloatingWhatsApp'
-import ScrollToTop from './components/ScrollToTop'
+'use client'
 
-export default function Home() {
+import Hero    from '@/app/components/Hero'
+import About   from '@/app/components/About'
+import Contact from '@/app/components/Contact'
+import Footer  from '@/app/components/Footer'
+import FloatingWhatsApp from '@/app/components/FloatingWhatsApp'
+import ScrollToTop      from '@/app/components/ScrollToTop'
+import ReviewSystem     from '@/app/components/ReviewSystem'
+
+export default function HomePage() {
   return (
-    <main className="min-h-screen">
-      <Navbar />
+    <>
       <Hero />
       <About />
-      <Menu />
-      <Services />
       <ReviewSystem />
       <Contact />
       <Footer />
-      <ScrollToTop />
       <FloatingWhatsApp />
-    </main>
+      <ScrollToTop />
+    </>
   )
 }

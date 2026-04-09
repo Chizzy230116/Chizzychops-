@@ -1,24 +1,24 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import Image from 'next/image'
+import Link     from 'next/link'
+import Image    from 'next/image'
+import { usePathname } from 'next/navigation'
 
 const WA = 'https://wa.me/2348094946923?text=Hi%20Chizzychops%20%26%20Grillz!%20I%27d%20like%20to%20place%20an%20order%20%F0%9F%8D%BD%EF%B8%8F'
 
 const links = [
-  { href:'#about',    label:'About'       },
-  { href:'#menu',     label:'Menu'        },
-  { href:'#services', label:'Services'    },
-  { href:'#reservation',label:'Reserve'  },
-  // { href:'#track',    label:'Track Order' },
-  // { href:'#loyalty',  label:'Rewards'     },
-  { href:'#contact',  label:'Contact'     },
+  { href: '/',          label: 'Home'     },
+  { href: '/menu',      label: 'Menu'     },
+  { href: '/services',  label: 'Services' },
+  { href: '/#about',    label: 'About'    },
+  { href: '/#contact',  label: 'Contact'  },
 ]
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]         = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40)
@@ -26,59 +26,65 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', fn)
   }, [])
 
-  // Lock body scroll when menu open
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [open])
+
+  // On inner pages navbar is always solid
+  const isHome   = pathname === '/'
+  const isSolid  = scrolled || !isHome
 
   return (
     <>
       <nav style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
         transition: 'all 0.3s ease',
-        background: scrolled ? 'rgba(10,3,0,0.97)' : 'transparent',
-        backdropFilter: scrolled ? 'blur(20px)' : 'none',
-        WebkitBackdropFilter: scrolled ? 'blur(20px)' : 'none',
-        borderBottom: scrolled ? '1px solid rgba(255,255,255,0.07)' : '1px solid transparent',
+        background: isSolid ? 'rgba(10,3,0,0.97)' : 'transparent',
+        backdropFilter: isSolid ? 'blur(20px)' : 'none',
+        WebkitBackdropFilter: isSolid ? 'blur(20px)' : 'none',
+        borderBottom: isSolid ? '1px solid rgba(255,255,255,0.07)' : '1px solid transparent',
       }}>
         <div className="container">
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', height:'68px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '68px' }}>
 
             {/* Logo */}
-            <Link href="/" style={{ display:'flex', alignItems:'center', gap:'0.625rem', textDecoration:'none', flexShrink:0 }}>
-              <div style={{ width:'42px', height:'42px', borderRadius:'50%', overflow:'hidden', border:'2px solid rgba(249,115,22,0.5)', flexShrink:0 }}>
-                <Image src="/logo.jpg" alt="Chizzychops" width={42} height={42} style={{ objectFit:'cover' }} priority />
+            <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', textDecoration: 'none', flexShrink: 0 }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(249,115,22,0.5)', flexShrink: 0 }}>
+                <Image src="/logo.jpg" alt="Chizzychops" width={42} height={42} style={{ objectFit: 'cover' }} priority />
               </div>
-              <div style={{ display:'flex', flexDirection:'column', lineHeight:1.1 }}>
-                <span style={{ fontFamily:'var(--font-playfair)', color:'#fff', fontWeight:700, fontSize:'1rem', letterSpacing:'-0.01em' }}>Chizzychops</span>
-                <span style={{ color:'#F97316', fontSize:'0.625rem', fontWeight:800, letterSpacing:'0.16em', textTransform:'uppercase' }}>&amp; Grillz</span>
+              <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+                <span style={{ fontFamily: 'var(--font-playfair)', color: '#fff', fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.01em' }}>Chizzychops</span>
+                <span style={{ color: '#F97316', fontSize: '0.625rem', fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase' }}>&amp; Grillz</span>
               </div>
             </Link>
 
-            {/* Desktop nav links */}
-            <div style={{ display:'flex', alignItems:'center', gap:'1.75rem' }} className="desktop-nav">
-              {links.map(l => (
-                <a key={l.href} href={l.href}
-                  style={{ color:'rgba(255,255,255,0.6)', fontSize:'0.875rem', fontWeight:600, textDecoration:'none', transition:'color 0.2s', whiteSpace:'nowrap', letterSpacing:'0.01em' }}
-                  onMouseEnter={e => (e.currentTarget.style.color='#F97316')}
-                  onMouseLeave={e => (e.currentTarget.style.color='rgba(255,255,255,0.6)')}>
-                  {l.label}
-                </a>
-              ))}
+            {/* Desktop nav */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.75rem' }} className="desktop-nav">
+              {links.map(l => {
+                const active = pathname === l.href || (l.href !== '/' && pathname.startsWith(l.href.split('#')[0]) && !l.href.includes('#'))
+                return (
+                  <Link key={l.href} href={l.href}
+                    style={{ color: active ? '#F97316' : 'rgba(255,255,255,0.6)', fontSize: '0.875rem', fontWeight: active ? 700 : 600, textDecoration: 'none', transition: 'color 0.2s', whiteSpace: 'nowrap', letterSpacing: '0.01em' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#F97316')}
+                    onMouseLeave={e => (e.currentTarget.style.color = active ? '#F97316' : 'rgba(255,255,255,0.6)')}>
+                    {l.label}
+                  </Link>
+                )
+              })}
             </div>
 
-            {/* Desktop CTA */}
+            {/* Desktop CTA — Order Now only */}
             <a href={WA} target="_blank" rel="noopener noreferrer"
               className="desktop-cta"
               style={{
-                display:'inline-flex', alignItems:'center', gap:'0.5rem',
-                background:'linear-gradient(135deg,#F97316,#DC2626)',
-                color:'#fff', fontWeight:800, fontSize:'0.875rem',
-                padding:'0.625rem 1.25rem', borderRadius:'9999px',
-                textDecoration:'none', border:'none',
-                boxShadow:'0 4px 16px rgba(249,115,22,0.35)',
-                transition:'all 0.2s ease', whiteSpace:'nowrap', flexShrink:0,
+                display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                background: 'linear-gradient(135deg,#F97316,#DC2626)',
+                color: '#fff', fontWeight: 800, fontSize: '0.875rem',
+                padding: '0.625rem 1.25rem', borderRadius: '9999px',
+                textDecoration: 'none',
+                boxShadow: '0 4px 16px rgba(249,115,22,0.35)',
+                transition: 'all 0.2s ease', whiteSpace: 'nowrap', flexShrink: 0,
               }}
               onMouseEnter={e => { const el = e.currentTarget as HTMLAnchorElement; el.style.transform='translateY(-1px)'; el.style.boxShadow='0 6px 20px rgba(249,115,22,0.5)' }}
               onMouseLeave={e => { const el = e.currentTarget as HTMLAnchorElement; el.style.transform='translateY(0)'; el.style.boxShadow='0 4px 16px rgba(249,115,22,0.35)' }}>
@@ -86,13 +92,11 @@ export default function Navbar() {
             </a>
 
             {/* Hamburger */}
-            <button onClick={() => setOpen(!open)}
-              className="hamburger"
-              aria-label="Toggle menu"
-              style={{ background:'none', border:'none', cursor:'pointer', padding:'0.5rem', display:'flex', flexDirection:'column', gap:'5px', flexShrink:0 }}>
-              <span style={{ display:'block', width:'22px', height:'2px', background:'#fff', borderRadius:'2px', transition:'all 0.3s', transform: open ? 'rotate(45deg) translate(5px,5px)' : 'none' }} />
-              <span style={{ display:'block', width:'22px', height:'2px', background:'#fff', borderRadius:'2px', transition:'all 0.3s', opacity: open ? 0 : 1 }} />
-              <span style={{ display:'block', width:'22px', height:'2px', background:'#fff', borderRadius:'2px', transition:'all 0.3s', transform: open ? 'rotate(-45deg) translate(5px,-5px)' : 'none' }} />
+            <button onClick={() => setOpen(!open)} className="hamburger" aria-label="Toggle menu"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '5px', flexShrink: 0 }}>
+              <span style={{ display: 'block', width: '22px', height: '2px', background: '#fff', borderRadius: '2px', transition: 'all 0.3s', transform: open ? 'rotate(45deg) translate(5px,5px)' : 'none' }} />
+              <span style={{ display: 'block', width: '22px', height: '2px', background: '#fff', borderRadius: '2px', transition: 'all 0.3s', opacity: open ? 0 : 1 }} />
+              <span style={{ display: 'block', width: '22px', height: '2px', background: '#fff', borderRadius: '2px', transition: 'all 0.3s', transform: open ? 'rotate(-45deg) translate(5px,-5px)' : 'none' }} />
             </button>
           </div>
         </div>
@@ -100,25 +104,32 @@ export default function Navbar() {
 
       {/* Mobile overlay */}
       {open && (
-        <div style={{ position:'fixed', inset:0, zIndex:99, background:'rgba(10,3,0,0.98)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', paddingTop:'80px', overflowY:'auto' }}
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99, background: 'rgba(10,3,0,0.98)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', paddingTop: '80px', overflowY: 'auto' }}
           className="mobile-menu">
-          <div className="container" style={{ paddingTop:'1.5rem', paddingBottom:'2rem' }}>
-            <div style={{ display:'flex', flexDirection:'column', gap:'0.25rem', marginBottom:'2rem' }}>
+          <div className="container" style={{ paddingTop: '1.5rem', paddingBottom: '2rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginBottom: '2rem' }}>
               {links.map(l => (
-                <a key={l.href} href={l.href} onClick={() => setOpen(false)}
-                  style={{ color:'rgba(255,255,255,0.8)', fontSize:'1.125rem', fontWeight:700, textDecoration:'none', padding:'0.875rem 0', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <Link key={l.href} href={l.href} onClick={() => setOpen(false)}
+                  style={{ color: 'rgba(255,255,255,0.8)', fontSize: '1.125rem', fontWeight: 700, textDecoration: 'none', padding: '0.875rem 0', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   {l.label}
-                  <span style={{ color:'rgba(249,115,22,0.6)', fontSize:'1rem' }}>→</span>
-                </a>
+                  <span style={{ color: 'rgba(249,115,22,0.6)', fontSize: '1rem' }}>→</span>
+                </Link>
               ))}
             </div>
-            <a href={WA} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}
-              style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'0.625rem', width:'100%', padding:'1rem', borderRadius:'0.875rem', background:'linear-gradient(135deg,#F97316,#DC2626)', color:'#fff', fontWeight:800, fontSize:'1.0625rem', textDecoration:'none', boxShadow:'0 4px 20px rgba(249,115,22,0.35)' }}>
-              <WAIconSm /> Order on WhatsApp
-            </a>
-            <div style={{ marginTop:'2rem', paddingTop:'2rem', borderTop:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
-              <p style={{ color:'rgba(255,255,255,0.3)', fontSize:'0.8125rem' }}>📍 Santos Estate, Akowonjo, Lagos</p>
-              <p style={{ color:'rgba(255,255,255,0.3)', fontSize:'0.8125rem', marginTop:'0.25rem' }}>⏰ Open Daily · Closes 8PM</p>
+            {/* Mobile: 2 CTAs max */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <a href={WA} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.625rem', width: '100%', padding: '1rem', borderRadius: '0.875rem', background: 'linear-gradient(135deg,#F97316,#DC2626)', color: '#fff', fontWeight: 800, fontSize: '1.0625rem', textDecoration: 'none', boxShadow: '0 4px 20px rgba(249,115,22,0.35)' }}>
+                <WAIconSm /> Order on WhatsApp
+              </a>
+              <Link href="/menu" onClick={() => setOpen(false)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%', padding: '0.875rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontWeight: 700, fontSize: '1rem', textDecoration: 'none' }}>
+                🍽️ View Full Menu
+              </Link>
+            </div>
+            <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8125rem' }}>🏡 Online Home Kitchen, Lagos</p>
+              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8125rem', marginTop: '0.25rem' }}>⏰ Mon–Sat 6AM–8PM · Sun 12PM–6PM</p>
             </div>
           </div>
         </div>
@@ -126,7 +137,7 @@ export default function Navbar() {
 
       <style>{`
         @media (min-width: 1024px) {
-          .hamburger { display: none !important; }
+          .hamburger   { display: none !important; }
           .mobile-menu { display: none !important; }
         }
         @media (max-width: 1023px) {
