@@ -8,8 +8,8 @@ const WA = 'https://wa.me/2348094946923?text=Hi%20Chizzychops%20%26%20Grillz!%20
 
 const links = [
   { href:'#about',    label:'About'       },
-  { href:'/Menu',     label:'Menu'        },
-  { href:'/services', label:'Services'    },
+  { href:'#menu',     label:'Menu'        },
+  { href:'#services', label:'Services'    },
   // { href:'#reservation',label:'Reserve'  },
   // { href:'#track',    label:'Track Order' },
   // { href:'#loyalty',  label:'Rewards'     },
