@@ -341,16 +341,25 @@ function CartDrawer({ cart, total, onClose, onRemove, onQty, onOrder }: {
       <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(6px)', WebkitBackdropFilter:'blur(6px)' }} />
       <div style={{ position:'fixed', top:0, right:0, bottom:0, width:'min(440px,100vw)', background:'#120800', zIndex:301, display:'flex', flexDirection:'column', boxShadow:'-16px 0 64px rgba(0,0,0,0.7)', animation:'slideInRight 0.32s cubic-bezier(0.22,1,0.36,1)', borderLeft:'1px solid rgba(249,115,22,0.12)' }}>
 
-        {/* Header */}
-        <div style={{ padding:'1.25rem 1.25rem', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, background:'rgba(249,115,22,0.04)' }}>
-          <div>
-            <h3 style={{ color:'#fff', fontFamily:'var(--font-playfair)', fontWeight:700, fontSize:'1.125rem', margin:'0 0 0.125rem' }}>Your Order</h3>
-            <p style={{ color:'rgba(255,255,255,0.35)', fontSize:'0.8125rem', margin:0 }}>{cart.reduce((s,c)=>s+c.qty,0)} item(s) selected</p>
-          </div>
-          <button onClick={onClose} style={{ width:'36px', height:'36px', borderRadius:'50%', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.65)', cursor:'pointer', fontSize:'1.25rem', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.2s', flexShrink:0 }}
-            onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.12)';e.currentTarget.style.color='#fff'}}
-            onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.07)';e.currentTarget.style.color='rgba(255,255,255,0.65)'}}>×</button>
-        </div>
+       {/* Header */}
+<div style={{ padding:'1.25rem', borderBottom:'1px solid rgba(255,255,255,0.06)', flexShrink:0, background:'rgba(249,115,22,0.04)' }}>
+  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'0.75rem' }}>
+    <div>
+      <h3 style={{ color:'#fff', fontFamily:'var(--font-playfair)', fontWeight:700, fontSize:'1.125rem', margin:'0 0 0.125rem' }}>Your Order</h3>
+      <p style={{ color:'rgba(255,255,255,0.35)', fontSize:'0.8125rem', margin:0 }}>{cart.reduce((s,c)=>s+c.qty,0)} item(s) selected</p>
+    </div>
+    <button onClick={onClose} style={{ display:'flex', alignItems:'center', gap:'0.375rem', padding:'0.5rem 0.875rem', borderRadius:'0.5rem', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:'0.8125rem', fontWeight:700, transition:'all 0.2s', flexShrink:0 }}
+      onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.12)';e.currentTarget.style.color='#fff'}}
+      onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.07)';e.currentTarget.style.color='rgba(255,255,255,0.55)'}}>
+      ← Back to Menu
+    </button>
+  </div>
+  {/* "Keep adding" nudge */}
+  <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', padding:'0.5rem 0.75rem', borderRadius:'0.625rem', background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.18)' }}>
+    <span style={{ fontSize:'0.875rem' }}>👆</span>
+    <p style={{ color:'rgba(249,115,22,0.85)', fontSize:'0.75rem', fontWeight:700, margin:0 }}>You can still add more items — go back and keep browsing!</p>
+  </div>
+</div>
 
         {/* Notice */}
         <div style={{ margin:'0.875rem 1.25rem 0', padding:'0.75rem 0.875rem', borderRadius:'0.75rem', background:'rgba(251,191,36,0.07)', border:'1px solid rgba(251,191,36,0.18)', display:'flex', gap:'0.625rem', alignItems:'flex-start' }}>
