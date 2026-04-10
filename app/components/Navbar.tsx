@@ -3,34 +3,41 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 
 const WA = 'https://wa.me/2348094946923?text=Hi%20Chizzychops%20%26%20Grillz!%20I%27d%20like%20to%20place%20an%20order%20%F0%9F%8D%BD%EF%B8%8F'
 
 const links = [
-  { href:'#about',    label:'About'       },
-  { href:'#menu',     label:'Menu'        },
-  { href:'#services', label:'Services'    },
-  // { href:'#reservation',label:'Reserve'  },
-  // { href:'#track',    label:'Track Order' },
-  // { href:'#loyalty',  label:'Rewards'     },
-  { href:'#contact',  label:'Contact'     },
+  { href: '/#about',    label: 'About'    },
+  { href: '/menu',      label: 'Menu'     },
+  { href: '/services',  label: 'Services' },
+  { href: '/#contact',  label: 'Contact'  },
 ]
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]         = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40)
-    window.addEventListener('scroll', fn)
+    window.addEventListener('scroll', fn, { passive: true })
     return () => window.removeEventListener('scroll', fn)
   }, [])
 
-  // Lock body scroll when menu open
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [open])
+
+  // Close mobile menu on route change
+  useEffect(() => { setOpen(false) }, [pathname])
+
+  const isActive = (href: string) => {
+    if (href === '/menu')     return pathname === '/menu'
+    if (href === '/services') return pathname === '/services'
+    return false
+  }
 
   return (
     <>
@@ -56,15 +63,21 @@ export default function Navbar() {
               </div>
             </Link>
 
-            {/* Desktop nav links */}
+            {/* Desktop nav */}
             <div style={{ display:'flex', alignItems:'center', gap:'1.75rem' }} className="desktop-nav">
               {links.map(l => (
-                <a key={l.href} href={l.href}
-                  style={{ color:'rgba(255,255,255,0.6)', fontSize:'0.875rem', fontWeight:600, textDecoration:'none', transition:'color 0.2s', whiteSpace:'nowrap', letterSpacing:'0.01em' }}
+                <Link key={l.href} href={l.href}
+                  style={{
+                    color: isActive(l.href) ? '#F97316' : 'rgba(255,255,255,0.6)',
+                    fontSize:'0.875rem', fontWeight: isActive(l.href) ? 800 : 600,
+                    textDecoration:'none', transition:'color 0.2s', whiteSpace:'nowrap',
+                    borderBottom: isActive(l.href) ? '2px solid #F97316' : '2px solid transparent',
+                    paddingBottom: '2px',
+                  }}
                   onMouseEnter={e => (e.currentTarget.style.color='#F97316')}
-                  onMouseLeave={e => (e.currentTarget.style.color='rgba(255,255,255,0.6)')}>
+                  onMouseLeave={e => (e.currentTarget.style.color = isActive(l.href) ? '#F97316' : 'rgba(255,255,255,0.6)')}>
                   {l.label}
-                </a>
+                </Link>
               ))}
             </div>
 
@@ -80,8 +93,8 @@ export default function Navbar() {
                 boxShadow:'0 4px 16px rgba(249,115,22,0.35)',
                 transition:'all 0.2s ease', whiteSpace:'nowrap', flexShrink:0,
               }}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLAnchorElement; el.style.transform='translateY(-1px)'; el.style.boxShadow='0 6px 20px rgba(249,115,22,0.5)' }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLAnchorElement; el.style.transform='translateY(0)'; el.style.boxShadow='0 4px 16px rgba(249,115,22,0.35)' }}>
+              onMouseEnter={e => { const el=e.currentTarget as HTMLAnchorElement; el.style.transform='translateY(-1px)'; el.style.boxShadow='0 6px 20px rgba(249,115,22,0.5)' }}
+              onMouseLeave={e => { const el=e.currentTarget as HTMLAnchorElement; el.style.transform='translateY(0)'; el.style.boxShadow='0 4px 16px rgba(249,115,22,0.35)' }}>
               <WAIconSm /> Order Now
             </a>
 
@@ -100,16 +113,20 @@ export default function Navbar() {
 
       {/* Mobile overlay */}
       {open && (
-        <div style={{ position:'fixed', inset:0, zIndex:99, background:'rgba(10,3,0,0.98)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', paddingTop:'80px', overflowY:'auto' }}
-          className="mobile-menu">
+        <div style={{ position:'fixed', inset:0, zIndex:99, background:'rgba(10,3,0,0.98)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', paddingTop:'80px', overflowY:'auto' }}>
           <div className="container" style={{ paddingTop:'1.5rem', paddingBottom:'2rem' }}>
             <div style={{ display:'flex', flexDirection:'column', gap:'0.25rem', marginBottom:'2rem' }}>
               {links.map(l => (
-                <a key={l.href} href={l.href} onClick={() => setOpen(false)}
-                  style={{ color:'rgba(255,255,255,0.8)', fontSize:'1.125rem', fontWeight:700, textDecoration:'none', padding:'0.875rem 0', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <Link key={l.href} href={l.href} onClick={() => setOpen(false)}
+                  style={{
+                    color: isActive(l.href) ? '#F97316' : 'rgba(255,255,255,0.8)',
+                    fontSize:'1.125rem', fontWeight:700, textDecoration:'none',
+                    padding:'0.875rem 0', borderBottom:'1px solid rgba(255,255,255,0.06)',
+                    display:'flex', justifyContent:'space-between', alignItems:'center',
+                  }}>
                   {l.label}
-                  <span style={{ color:'rgba(249,115,22,0.6)', fontSize:'1rem' }}>→</span>
-                </a>
+                  <span style={{ color: isActive(l.href) ? '#F97316' : 'rgba(249,115,22,0.6)', fontSize:'1rem' }}>→</span>
+                </Link>
               ))}
             </div>
             <a href={WA} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}
@@ -126,12 +143,11 @@ export default function Navbar() {
 
       <style>{`
         @media (min-width: 1024px) {
-          .hamburger { display: none !important; }
-          .mobile-menu { display: none !important; }
+          .hamburger    { display: none !important; }
         }
         @media (max-width: 1023px) {
-          .desktop-nav { display: none !important; }
-          .desktop-cta { display: none !important; }
+          .desktop-nav  { display: none !important; }
+          .desktop-cta  { display: none !important; }
         }
       `}</style>
     </>
