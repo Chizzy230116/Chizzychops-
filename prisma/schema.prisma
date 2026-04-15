@@ -35,7 +35,7 @@ model Order {
   subtotal        Int
   deliveryFee     Int         @default(0) @map("delivery_fee")
   total           Int
-  status          OrderStatus @default(pending)
+  status          OrderStatus @default(new)
   paystackData    Json?       @map("paystack_data")
   whatsappSent    Boolean     @default(false) @map("whatsapp_sent")
   createdAt       DateTime    @default(now()) @map("created_at")
@@ -92,6 +92,7 @@ model CateringSubmission {
 }
 
 enum OrderStatus {
+  new
   pending
   paid
   failed

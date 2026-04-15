@@ -19,7 +19,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey)
 // ─── Types (mirror Prisma schema exactly) ───────────────────────────────────
 
 export type OrderStatus =
-  | 'pending' | 'paid' | 'failed' | 'confirmed'
+  | 'new' | 'pending' | 'paid' | 'failed' | 'confirmed'
   | 'preparing' | 'ready' | 'delivered' | 'cancelled'
 
 export interface MenuItem {
