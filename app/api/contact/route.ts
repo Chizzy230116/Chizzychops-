@@ -14,15 +14,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const submission = await prisma.contactSubmission.create({
-      data: {
-        name:    name.trim(),
-        phone:   phone.trim(),
-        email:   email?.trim() || null,
-        message: message.trim(),
-        type:    'contact',
-      },
-    })
+  const submission = await prisma.contactSubmission.create({
+  data: {
+    id:      `MSG-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+    name:    name.trim(),
+    phone:   phone.trim(),
+    email:   email?.trim() || null,
+    message: message.trim(),
+    type:    'contact',
+  },
+})
 
     return NextResponse.json({ success: true, id: submission.id })
   } catch (err) {

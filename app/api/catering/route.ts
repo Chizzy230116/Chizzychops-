@@ -15,16 +15,17 @@ export async function POST(req: NextRequest) {
     }
 
     const submission = await prisma.cateringSubmission.create({
-      data: {
-        name,
-        phone,
-        eventDate: event_date,
-        guests,
-        eventType: event_type || '',
-        notes:     notes      || '',
-        type:      'catering',
-      },
-    })
+  data: {
+    id:        `CAT-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+    name,
+    phone,
+    eventDate: event_date,
+    guests,
+    eventType: event_type || '',
+    notes:     notes      || '',
+    type:      'catering',
+  },
+})
 
     return NextResponse.json({ success: true, id: submission.id })
   } catch (err) {

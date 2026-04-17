@@ -2,11 +2,22 @@
 
 import { useState, useEffect, useRef } from 'react'
 
-// ── Types ─────────────────────────────────────────────────
+// ── Types (matches exactly what /api/menu returns) ─────────
 type Item = {
-  id: string; name: string; price: number; priceLabel: string
-  cat: string; subcat?: string; desc: string; img: string; img2?: string
-  badge?: string; badgeColor?: string; note?: string
+  id: string
+  name: string
+  price: number
+  priceLabel: string
+  category: string
+  subcat?: string
+  description: string
+  badge?: string
+  badge_color?: string
+  note?: string
+  img_url: string
+  img2_url?: string
+  sort_order: number
+  updated_at: string
 }
 
 type CartItem = Item & { qty: number }
@@ -35,7 +46,8 @@ export default function Menu() {
       .catch(() => setLoading(false))
   }, [])
 
-  const filtered  = cat === 'All' ? MENU : MENU.filter(i => i.cat === cat)
+  // ✅ Fixed: was i.cat === cat (always undefined), now i.category === cat
+  const filtered  = cat === 'All' ? MENU : MENU.filter(i => i.category === cat)
   const displayed = showAll ? filtered : filtered.slice(0, 9)
 
   const addToCart = (item: Item) => {
@@ -209,8 +221,10 @@ export default function Menu() {
 // MENU CARD
 // ══════════════════════════════════════════════════════════
 function MenuCard({ item, inCart, onAdd }: { item: Item; inCart: number; onAdd: () => void }) {
-  const badgeColor = item.badgeColor || '#F97316'
-  const hasTwo     = !!item.img2
+  // ✅ Fixed: was item.badgeColor, API returns badge_color
+  const badgeColor = item.badge_color || '#F97316'
+  // ✅ Fixed: was item.img2, API returns img2_url
+  const hasTwo     = !!item.img2_url
   const [showSecond, setShowSecond] = useState(false)
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -239,11 +253,13 @@ function MenuCard({ item, inCart, onAdd }: { item: Item; inCart: number; onAdd: 
       <div style={{ position:'relative', height:'190px', overflow:'hidden', flexShrink:0, cursor:hasTwo?'pointer':'default' }}
         onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={item.img} alt={item.name} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', transition:'opacity 0.65s ease,transform 0.55s ease', opacity:showSecond?0:1, transform:showSecond?'scale(1.06)':'scale(1)' }}
+        {/* ✅ Fixed: was item.img, API returns img_url */}
+        <img src={item.img_url} alt={item.name} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', transition:'opacity 0.65s ease,transform 0.55s ease', opacity:showSecond?0:1, transform:showSecond?'scale(1.06)':'scale(1)' }}
           onError={e=>{(e.target as HTMLImageElement).src='https://placehold.co/280x190/1A0800/F97316?text=No+Image'}} />
         {hasTwo && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.img2} alt={`${item.name} 2`} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', transition:'opacity 0.65s ease,transform 0.55s ease', opacity:showSecond?1:0, transform:showSecond?'scale(1)':'scale(1.06)' }}
+          // ✅ Fixed: was item.img2, API returns img2_url
+          <img src={item.img2_url} alt={`${item.name} 2`} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', transition:'opacity 0.65s ease,transform 0.55s ease', opacity:showSecond?1:0, transform:showSecond?'scale(1)':'scale(1.06)' }}
             onError={e=>{(e.target as HTMLImageElement).style.display='none'}} />
         )}
         {hasTwo && (
@@ -265,7 +281,8 @@ function MenuCard({ item, inCart, onAdd }: { item: Item; inCart: number; onAdd: 
 
       <div style={{ padding:'1.125rem 1.125rem 1rem', display:'flex', flexDirection:'column', gap:'0.375rem', flex:1 }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'0.5rem', marginBottom:'0.125rem' }}>
-          <span style={{ fontSize:'0.625rem', fontWeight:800, letterSpacing:'0.08em', textTransform:'uppercase', color:'rgba(249,115,22,0.6)' }}>{item.cat}</span>
+          {/* ✅ Fixed: was item.cat, API returns category */}
+          <span style={{ fontSize:'0.625rem', fontWeight:800, letterSpacing:'0.08em', textTransform:'uppercase', color:'rgba(249,115,22,0.6)' }}>{item.category}</span>
           {item.subcat && <span style={{ fontSize:'0.625rem', fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:'rgba(255,255,255,0.2)' }}>{item.subcat}</span>}
         </div>
         <h3 style={{ color:'#fff', fontFamily:'var(--font-playfair)', fontWeight:700, fontSize:'1rem', lineHeight:1.3, margin:0 }}>{item.name}</h3>
@@ -275,7 +292,8 @@ function MenuCard({ item, inCart, onAdd }: { item: Item; inCart: number; onAdd: 
             <p style={{ color:'#F97316', fontSize:'0.6875rem', fontWeight:700, margin:0 }}>{item.note}</p>
           </div>
         )}
-        <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'0.8125rem', lineHeight:1.65, flex:1, margin:0 }}>{item.desc}</p>
+        {/* ✅ Fixed: was item.desc, API returns description */}
+        <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'0.8125rem', lineHeight:1.65, flex:1, margin:0 }}>{item.description}</p>
         <button onClick={onAdd}
           style={{ marginTop:'0.875rem', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem', padding:'0.75rem', borderRadius:'0.75rem', border:`1px solid ${inCart>0?'rgba(249,115,22,0.45)':'rgba(255,255,255,0.1)'}`, cursor:'pointer', fontWeight:800, fontSize:'0.875rem', transition:'all 0.2s', background:inCart>0?'linear-gradient(135deg,rgba(249,115,22,0.18),rgba(220,38,38,0.12))':'rgba(255,255,255,0.04)', color:inCart>0?'#F97316':'rgba(255,255,255,0.6)' }}
           onMouseEnter={e=>{e.currentTarget.style.background='linear-gradient(135deg,rgba(249,115,22,0.25),rgba(220,38,38,0.18))';e.currentTarget.style.color='#F97316';e.currentTarget.style.border='1px solid rgba(249,115,22,0.5)'}}
@@ -330,7 +348,8 @@ function CartDrawer({ cart, total, onClose, onRemove, onQty, onOrder }: {
             <div key={item.id} style={{ display:'flex', gap:'0.75rem', padding:'0.875rem 0', borderBottom:idx<cart.length-1?'1px solid rgba(255,255,255,0.05)':'none', alignItems:'center' }}>
               <div style={{ width:'52px', height:'52px', borderRadius:'0.75rem', overflow:'hidden', flexShrink:0, border:'1px solid rgba(255,255,255,0.08)' }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={item.img} alt={item.name} style={{ width:'100%', height:'100%', objectFit:'cover' }}
+                {/* ✅ Fixed: was item.img, API returns img_url */}
+                <img src={item.img_url} alt={item.name} style={{ width:'100%', height:'100%', objectFit:'cover' }}
                   onError={e=>{(e.target as HTMLImageElement).src='https://placehold.co/52x52/1A0800/F97316?text=?'}} />
               </div>
               <div style={{ flex:1, minWidth:0 }}>
