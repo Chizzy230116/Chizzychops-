@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model MenuItem {
+  id          String   @id @default(cuid())
+  name        String
+  price       Float
+  category    String
+  subcat      String?
+  description String
+  badge       String?
+  badgeColor  String?  @map("badge_color")
+  note        String?
+  imgUrl      String   @map("img_url")
+  img2Url     String?  @map("img2_url")
+  sortOrder   Int      @default(0) @map("sort_order")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("menu_items")
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  reference       String      @unique
+  customerName    String      @map("customer_name")
+  customerEmail   String      @map("customer_email")
+  customerPhone   String      @map("customer_phone")
+  deliveryAddress String      @map("delivery_address")
+  items           Json
+  subtotal        Int
+  deliveryFee     Int         @default(0) @map("delivery_fee")
+  total           Int
+  status          OrderStatus @default(new)
+  paystackData    Json?       @map("paystack_data")
+  whatsappSent    Boolean     @default(false) @map("whatsapp_sent")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  @@index([reference])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("orders")
+}
+
+model ContactSubmission {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  message   String
+  type      String   @default("contact")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("contact_submissions")
+}
+
+model ReviewSubmission {
+  id         String   @id @default(cuid())
+  name       String
+  dish       String
+  overall    Int
+  taste      Int
+  portion    Int
+  delivery   Int
+  packaging  Int
+  value      Int
+  recommend  Boolean
+  reviewText String   @map("review_text")
+  type       String   @default("review")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("review_submissions")
+}
+
+model CateringSubmission {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  eventDate String   @map("event_date")
+  guests    String
+  eventType String   @map("event_type")
+  notes     String
+  type      String   @default("catering")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("catering_submissions")
+}
+
+enum OrderStatus {
+  new
+  pending
+  paid
+  failed
+  confirmed
+  preparing
+  ready
+  delivered
+  cancelled
+}

@@ -21,6 +21,9 @@ const STATUS: Record<OrderStatus,{label:string;color:string;bg:string;next?:Orde
   ready:     {label:'📦 Ready',     color:'#F97316',bg:'rgba(249,115,22,0.15)',  next:'delivered'},
   delivered: {label:'🎉 Delivered', color:'#A3E635',bg:'rgba(163,230,53,0.15)'},
   cancelled: {label:'❌ Cancelled', color:'#F87171',bg:'rgba(248,113,113,0.15)'},
+  pending:   {label:'⏳ Pending',    color:'#94A3B8',bg:'rgba(148,163,184,0.15)'},
+  paid:      {label:'💳 Paid',      color:'#10B981',bg:'rgba(16,185,129,0.15)'},
+  failed:    {label:'❌ Failed',    color:'#EF4444',bg:'rgba(239,68,68,0.15)'},
 }
 
 const EMPTY: Omit<MenuItem,'updated_at'> = {
@@ -247,7 +250,7 @@ function Dashboard() {
 
   const notifyWA = (o:Order) => {
     const lines=(o.items as any[]).map(i=>`• ${i.name} x${i.qty} — ${fmt(i.price*i.qty)}`)
-    const msg=[`🆕 *NEW ORDER — ${o.id}*`,'',`👤 ${o.customer_name||'Unknown'}`,o.customer_phone?`📞 ${o.customer_phone}`:'','',...lines,'',`💰 *Total: ${fmt(o.total)}*`,o.note?`📝 ${o.note}`:'',o.address?`📍 ${o.address}`:'','',`https://chizzychops.vercel.app/admin`].filter(Boolean).join('\n')
+    const msg=[`🆕 *NEW ORDER — ${o.id}*`,'',`👤 ${o.customer_name||'Unknown'}`,o.customer_phone?`📞 ${o.customer_phone}`:'','',...lines,'',`💰 *Total: ${fmt(o.total)}*`,(o as any).note?`📝 ${(o as any).note}`:'',((o as any).address)?`📍 ${(o as any).address}`:'','',`https://chizzychops.vercel.app/admin`].filter(Boolean).join('\n')
     window.open(`https://wa.me/${OWNER_WA}?text=${encodeURIComponent(msg)}`,'_blank')
   }
 
@@ -472,7 +475,7 @@ function OrdersPanel({orders,loading,onStatusChange,onDelete,onNotify,onRefresh,
                   <div style={{borderTop:'1px solid rgba(255,255,255,0.06)',padding:'0.875rem'}}>
                     <div style={{marginBottom:'0.75rem',background:'rgba(255,255,255,0.02)',borderRadius:'0.625rem',padding:'0.625rem'}}>
                       {(order.items as any[]).map((item:any,i:number)=>(
-                        <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'0.25rem 0',borderBottom:i<order.items.length-1?'1px solid rgba(255,255,255,0.04)':'none'}}>
+                        <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'0.25rem 0',borderBottom:i<(order.items as any[]).length-1?'1px solid rgba(255,255,255,0.04)':'none'}}>
                           <span style={{color:'#fff',fontSize:'0.875rem'}}>{item.name} <span style={{color:'rgba(255,255,255,0.35)'}}>×{item.qty}</span></span>
                           <span style={{color:'#FBBF24',fontWeight:700,fontSize:'0.875rem'}}>{fmt(item.price*item.qty)}</span>
                         </div>
@@ -483,8 +486,8 @@ function OrdersPanel({orders,loading,onStatusChange,onDelete,onNotify,onRefresh,
                       </div>
                     </div>
                     {order.customer_phone&&<p style={{color:'#25D366',fontSize:'0.8125rem',marginBottom:'0.375rem'}}>📞 {order.customer_phone}</p>}
-                    {order.note&&<p style={{color:'rgba(255,255,255,0.6)',fontSize:'0.8125rem',marginBottom:'0.375rem'}}>📝 {order.note}</p>}
-                    {order.address&&<p style={{color:'rgba(255,255,255,0.6)',fontSize:'0.8125rem',marginBottom:'0.75rem'}}>📍 {order.address}</p>}
+                    {(order as any).note&&<p style={{color:'rgba(255,255,255,0.6)',fontSize:'0.8125rem',marginBottom:'0.375rem'}}>📝 {(order as any).note}</p>}
+                    {(order as any).address&&<p style={{color:'rgba(255,255,255,0.6)',fontSize:'0.8125rem',marginBottom:'0.75rem'}}>📍 {(order as any).address}</p>}
                     <div style={{display:'flex',gap:'0.375rem',flexWrap:'wrap',alignItems:'center'}}>
                       {cfg.next&&<button onClick={()=>onStatusChange(order.id,cfg.next!)} style={{...BP,fontSize:'0.75rem',padding:'0.4375rem 0.875rem'}}>→ {STATUS[cfg.next].label}</button>}
                       {!['delivered','cancelled'].includes(order.status)&&<button onClick={()=>onStatusChange(order.id,'cancelled')} style={{background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#F87171',padding:'0.4375rem 0.875rem',borderRadius:'9999px',cursor:'pointer',fontSize:'0.75rem',fontWeight:700}}>Cancel</button>}

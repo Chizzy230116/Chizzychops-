@@ -1,134 +1,120 @@
+/**
+ * app/lib/supabase.ts
+ *
+ * Supabase JS client  → auth, realtime, storage, direct table queries
+ * Data mutations      → Prisma via internal API routes (no supabase-js SDK needed for data)
+ *
+ * Drop-in replacement: all exports match what page.tsx already imports.
+ */
+
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl  = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+// ─── Supabase client (auth / realtime / storage) ────────────────────────────
 
-if (typeof window !== 'undefined' && (!supabaseUrl || !supabaseAnon)) {
-  throw new Error('Missing Supabase environment variables')
-}
+const supabaseUrl  = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseKey  = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createClient(
-  supabaseUrl  ?? 'https://placeholder.supabase.co',
-  supabaseAnon ?? 'placeholder-key'
-)
+export const supabase = createClient(supabaseUrl, supabaseKey)
 
-// ── Types ──────────────────────────────────────────────────
-export type MenuItem = {
-  id: string; name: string; price: number; category: string
-  subcat: string | null; description: string; badge: string | null
-  badge_color: string | null; note: string | null
-  img_url: string; img2_url: string | null
-  sort_order: number; updated_at: string
-}
+// ─── Types (mirror Prisma schema exactly) ───────────────────────────────────
 
 export type OrderStatus =
-  | 'new' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'cancelled'
+  | 'new' | 'pending' | 'paid' | 'failed' | 'confirmed'
+  | 'preparing' | 'ready' | 'delivered' | 'cancelled'
 
-export type OrderItem = { id: string; name: string; qty: number; price: number }
-
-export type Order = {
-  id: string; customer_name: string | null; customer_phone: string | null
-  items: OrderItem[]; total: number; status: OrderStatus
-  note: string | null; address: string | null
-  created_at: string; updated_at: string
+export interface MenuItem {
+  id:          string
+  name:        string
+  price:       number
+  category:    string
+  subcat:      string | null
+  description: string
+  badge:       string | null
+  badge_color: string | null
+  note:        string | null
+  img_url:     string
+  img2_url:    string | null
+  sort_order:  number
+  updated_at:  string
 }
 
-export type ContactSubmission = {
-  id?: string; name: string; phone: string; email?: string
-  message: string; type: 'contact'; created_at?: string
+export interface Order {
+  id:               string
+  reference:        string
+  customer_name:    string
+  customer_email:   string
+  customer_phone:   string
+  delivery_address: string
+  items:            unknown
+  subtotal:         number
+  delivery_fee:     number
+  total:            number
+  status:           OrderStatus
+  paystack_data:    unknown | null
+  whatsapp_sent:    boolean
+  created_at:       string
+  updated_at:       string
 }
 
-export type ReviewSubmission = {
-  id?: string; name: string; dish: string; overall: number
-  taste: number; portion: number; delivery: number
-  packaging: number; value: number
-  recommend: boolean; review_text: string
-  type: 'review'; created_at?: string
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...init,
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => res.statusText)
+    throw new Error(`API ${url} → ${res.status}: ${body}`)
+  }
+  return res.json() as Promise<T>
 }
 
-export type CateringSubmission = {
-  id?: string; name: string; phone: string; event_date: string
-  guests: string; event_type: string; notes: string
-  type: 'catering'; created_at?: string
+// ─── Menu ─────────────────────────────────────────────────────────────────────
+
+export function fetchMenu(): Promise<MenuItem[]> {
+  return api<MenuItem[]>('/api/menu')
 }
 
-// ── Menu helpers ───────────────────────────────────────────
-export async function fetchMenu(): Promise<MenuItem[]> {
-  const { data, error } = await supabase
-    .from('menu_items').select('*').order('sort_order', { ascending: true })
-  if (error) throw error
-  return data ?? []
+export function upsertItem(item: Partial<MenuItem>): Promise<MenuItem> {
+  return api<MenuItem>('/api/menu', {
+    method: 'POST',
+    body: JSON.stringify(item),
+  })
 }
 
-export async function upsertItem(item: Omit<MenuItem, 'updated_at'>): Promise<void> {
-  const { error } = await supabase
-    .from('menu_items').upsert({ ...item, updated_at: new Date().toISOString() })
-  if (error) throw error
+export function deleteItem(id: string): Promise<void> {
+  return api<void>(`/api/menu?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
-export async function deleteItem(id: string): Promise<void> {
-  const { error } = await supabase.from('menu_items').delete().eq('id', id)
-  if (error) throw error
+// ─── Orders ───────────────────────────────────────────────────────────────────
+
+export function fetchOrders(): Promise<Order[]> {
+  return api<Order[]>('/api/orders')
 }
 
-// ── Order helpers ──────────────────────────────────────────
-export async function createOrder(order: {
-  customer_name?: string; customer_phone?: string
-  items: OrderItem[]; total: number; note?: string; address?: string
-}): Promise<Order> {
-  const { data, error } = await supabase
-    .from('orders')
-    .insert([{ ...order, status: 'new',
-      customer_name: order.customer_name || null,
-      customer_phone: order.customer_phone || null,
-      note: order.note || null, address: order.address || null,
-    }]).select().single()
-  if (error) throw error
-  return data as Order
+export function updateOrderStatus(id: string, status: OrderStatus): Promise<Order> {
+  return api<Order>('/api/orders', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, status }),
+  })
 }
 
-export async function fetchOrders(): Promise<Order[]> {
-  const { data, error } = await supabase
-    .from('orders').select('*').order('created_at', { ascending: false })
-  if (error) throw error
-  return (data ?? []) as Order[]
+export function deleteOrder(id: string): Promise<void> {
+  return api<void>(`/api/orders?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
-export async function updateOrderStatus(id: string, status: OrderStatus): Promise<void> {
-  const { error } = await supabase.from('orders')
-    .update({ status, updated_at: new Date().toISOString() }).eq('id', id)
-  if (error) throw error
-}
+// ─── Image upload (Supabase Storage) ─────────────────────────────────────────
 
-export async function deleteOrder(id: string): Promise<void> {
-  const { error } = await supabase.from('orders').delete().eq('id', id)
-  if (error) throw error
-}
-
-// ── Contact submission ─────────────────────────────────────
-export async function saveContact(data: Omit<ContactSubmission, 'id' | 'created_at'>): Promise<void> {
-  const { error } = await supabase.from('contact_submissions').insert([data])
-  if (error) throw error
-}
-
-// ── Review submission ──────────────────────────────────────
-export async function saveReview(data: Omit<ReviewSubmission, 'id' | 'created_at'>): Promise<void> {
-  const { error } = await supabase.from('review_submissions').insert([data])
-  if (error) throw error
-}
-
-// ── Catering submission ────────────────────────────────────
-export async function saveCatering(data: Omit<CateringSubmission, 'id' | 'created_at'>): Promise<void> {
-  const { error } = await supabase.from('catering_submissions').insert([data])
-  if (error) throw error
-}
-
-// ── Image upload ───────────────────────────────────────────
 export async function uploadImage(file: File): Promise<string> {
-  const ext  = file.name.split('.').pop()
-  const path = `menu/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-  const { error } = await supabase.storage
-    .from('food-images').upload(path, file, { upsert: true })
-  if (error) throw error
-  return supabase.storage.from('food-images').getPublicUrl(path).data.publicUrl
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const res = await fetch('/api/upload', { method: 'POST', body: formData })
+  if (!res.ok) {
+    const body = await res.text().catch(() => res.statusText)
+    throw new Error(`Upload failed: ${body}`)
+  }
+  const { url } = await res.json() as { url: string }
+  return url
 }

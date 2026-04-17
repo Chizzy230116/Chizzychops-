@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { saveContact } from '@/app/lib/supabase'
 
 const WA = 'https://wa.me/2348094946923'
 const IG = 'https://www.instagram.com/chizzychops1/'
@@ -18,13 +17,23 @@ export default function Contact() {
   const handleSubmit = async () => {
     if(!name.trim()||!phone.trim()||!message.trim()) { setErr('Please fill in Name, Phone and Message'); return }
     setBusy(true); setErr('')
-    // 1. Save to database first
+
+    // 1. Save to database via API route
     try {
-      await saveContact({ name:name.trim(), phone:phone.trim(), email:email.trim()||undefined, message:message.trim(), type:'contact' })
+      await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name:    name.trim(),
+          phone:   phone.trim(),
+          email:   email.trim() || undefined,
+          message: message.trim(),
+        }),
+      })
     } catch(e) {
-      // Don't block WhatsApp if DB fails — still open WA
       console.error('DB save failed:', e)
     }
+
     // 2. Open WhatsApp
     const lines = [
       `💬 *Contact Message — Chizzychops & Grillz*`, ``,
@@ -72,7 +81,7 @@ export default function Contact() {
           ))}
         </div>
 
-        {/* Contact form — saves to DB + opens WhatsApp */}
+        {/* Contact form */}
         <div style={{ borderRadius: '1.25rem', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden', marginBottom: '1.5rem' }}>
           <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <p style={{ color: '#fff', fontFamily: 'var(--font-playfair)', fontWeight: 700, fontSize: '1.125rem' }}>Send Us a Message</p>
