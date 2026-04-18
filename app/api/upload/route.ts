@@ -2,21 +2,16 @@
  * app/api/upload/route.ts
  *
  * POST /api/upload  (multipart/form-data, field: "file")
- * → uploads to Supabase Storage bucket "menu-images"
+ * → saves image to public/uploads/
  * → returns { url: string }
+ *
+ * Zero Supabase. Files are served statically from /uploads/filename.
+ * For production, swap writeFile for your cloud storage of choice (S3, R2, etc.)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// Service-role key keeps uploads server-side and bypasses RLS.
-// Add SUPABASE_SERVICE_ROLE_KEY to .env.local (never expose to browser).
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-const BUCKET = 'menu-images'
+import { writeFile, mkdir } from 'fs/promises'
+import { join }             from 'path'
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,18 +22,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    const ext    = file.name.split('.').pop() ?? 'jpg'
-    const path   = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const ext      = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const uploadDir = join(process.cwd(), 'public', 'uploads')
+    const filePath  = join(uploadDir, filename)
+
+    // Ensure uploads directory exists
+    await mkdir(uploadDir, { recursive: true })
+
     const buffer = Buffer.from(await file.arrayBuffer())
+    await writeFile(filePath, buffer)
 
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(path, buffer, { contentType: file.type, upsert: true })
-
-    if (error) throw error
-
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
-    return NextResponse.json({ url: data.publicUrl })
+    return NextResponse.json({ url: `/uploads/${filename}` })
   } catch (err) {
     console.error('POST /api/upload error:', err)
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 })

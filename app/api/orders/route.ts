@@ -1,14 +1,13 @@
 /**
  * app/api/orders/route.ts
  *
- * GET    /api/orders          → list all orders (newest first) — admin panel
- * PATCH  /api/orders          → { id, status } update status   — admin panel
- * DELETE /api/orders?id=      → delete order                   — admin panel
+ * GET    /api/orders     → list all orders (newest first)
+ * PATCH  /api/orders     → { id, status } update status
+ * DELETE /api/orders?id= → delete order
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/app/lib/prisma'
-import { OrderStatus } from '@prisma/client'
 
 // ─── GET ─────────────────────────────────────────────────────────────────────
 
@@ -19,21 +18,16 @@ export async function GET() {
     })
 
     const mapped = orders.map(o => ({
-      id:               o.id,
-      reference:        o.reference,
-      customer_name:    o.customerName,
-      customer_email:   o.customerEmail,
-      customer_phone:   o.customerPhone,
-      delivery_address: o.deliveryAddress,
-      items:            o.items,
-      subtotal:         o.subtotal,
-      delivery_fee:     o.deliveryFee,
-      total:            o.total,
-      status:           o.status,
-      paystack_data:    o.paystackData,
-      whatsapp_sent:    o.whatsappSent,
-      created_at:       o.createdAt.toISOString(),
-      updated_at:       o.updatedAt.toISOString(),
+      id:             o.id,
+      customer_name:  o.customerName,
+      customer_phone: o.customerPhone,
+      items:          o.items,
+      total:          o.total,
+      status:         o.status,
+      note:           o.note,
+      address:        o.address,
+      created_at:     o.createdAt.toISOString(),
+      updated_at:     o.updatedAt.toISOString(),
     }))
 
     return NextResponse.json(mapped)
@@ -47,7 +41,7 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const { id, status } = await req.json() as { id: string; status: OrderStatus }
+    const { id, status } = await req.json() as { id: string; status: string }
 
     if (!id || !status) {
       return NextResponse.json({ error: 'id and status required' }, { status: 400 })
@@ -59,21 +53,16 @@ export async function PATCH(req: NextRequest) {
     })
 
     return NextResponse.json({
-      id:               order.id,
-      reference:        order.reference,
-      customer_name:    order.customerName,
-      customer_email:   order.customerEmail,
-      customer_phone:   order.customerPhone,
-      delivery_address: order.deliveryAddress,
-      items:            order.items,
-      subtotal:         order.subtotal,
-      delivery_fee:     order.deliveryFee,
-      total:            order.total,
-      status:           order.status,
-      paystack_data:    order.paystackData,
-      whatsapp_sent:    order.whatsappSent,
-      created_at:       order.createdAt.toISOString(),
-      updated_at:       order.updatedAt.toISOString(),
+      id:             order.id,
+      customer_name:  order.customerName,
+      customer_phone: order.customerPhone,
+      items:          order.items,
+      total:          order.total,
+      status:         order.status,
+      note:           order.note,
+      address:        order.address,
+      created_at:     order.createdAt.toISOString(),
+      updated_at:     order.updatedAt.toISOString(),
     })
   } catch (err) {
     console.error('PATCH /api/orders error:', err)

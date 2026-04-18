@@ -3,10 +3,11 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  supabase, fetchMenu, upsertItem, deleteItem, uploadImage,
-  fetchOrders, updateOrderStatus, deleteOrder,
-} from '@/app/lib/supabase'
-import type { MenuItem, Order, OrderStatus } from '@/app/lib/supabase'
+  checkSession, loginWithPassword, logout,
+  fetchMenu, upsertItem, deleteItem, uploadImage,
+  fetchOrders, updateOrderStatus, deleteOrder, fetchInbox,
+} from '@/app/lib/api'
+import type { MenuItem, Order, OrderStatus, InboxItem } from '@/app/lib/api'
 
 const OWNER_WA = '2348094946923'
 const CATS     = ['Soups','Stews','Rice & Pottage','Pasta & Rice','Food Boxes']
@@ -15,15 +16,15 @@ const TABS     = ['📋 Orders','🍽️ Menu','💬 Inbox','📊 Stats'] as con
 type Tab       = typeof TABS[number]
 
 const STATUS: Record<OrderStatus,{label:string;color:string;bg:string;next?:OrderStatus}> = {
-  new:       {label:'🆕 New',       color:'#60A5FA',bg:'rgba(96,165,250,0.15)',  next:'confirmed'},
-  confirmed: {label:'✅ Confirmed', color:'#4ADE80',bg:'rgba(74,222,128,0.15)',  next:'preparing'},
-  preparing: {label:'👩‍🍳 Preparing',color:'#FBBF24',bg:'rgba(251,191,36,0.15)', next:'ready'},
-  ready:     {label:'📦 Ready',     color:'#F97316',bg:'rgba(249,115,22,0.15)',  next:'delivered'},
-  delivered: {label:'🎉 Delivered', color:'#A3E635',bg:'rgba(163,230,53,0.15)'},
-  cancelled: {label:'❌ Cancelled', color:'#F87171',bg:'rgba(248,113,113,0.15)'},
+  new:       {label:'🆕 New',        color:'#60A5FA',bg:'rgba(96,165,250,0.15)',  next:'confirmed'},
+  confirmed: {label:'✅ Confirmed',  color:'#4ADE80',bg:'rgba(74,222,128,0.15)',  next:'preparing'},
+  preparing: {label:'👩‍🍳 Preparing', color:'#FBBF24',bg:'rgba(251,191,36,0.15)', next:'ready'},
+  ready:     {label:'📦 Ready',      color:'#F97316',bg:'rgba(249,115,22,0.15)',  next:'delivered'},
+  delivered: {label:'🎉 Delivered',  color:'#A3E635',bg:'rgba(163,230,53,0.15)'},
+  cancelled: {label:'❌ Cancelled',  color:'#F87171',bg:'rgba(248,113,113,0.15)'},
   pending:   {label:'⏳ Pending',    color:'#94A3B8',bg:'rgba(148,163,184,0.15)'},
-  paid:      {label:'💳 Paid',      color:'#10B981',bg:'rgba(16,185,129,0.15)'},
-  failed:    {label:'❌ Failed',    color:'#EF4444',bg:'rgba(239,68,68,0.15)'},
+  paid:      {label:'💳 Paid',       color:'#10B981',bg:'rgba(16,185,129,0.15)'},
+  failed:    {label:'❌ Failed',     color:'#EF4444',bg:'rgba(239,68,68,0.15)'},
 }
 
 const EMPTY: Omit<MenuItem,'updated_at'> = {
@@ -45,48 +46,41 @@ const timeAgo = (d:string) => {
 // ROOT
 // ══════════════════════════════════════════════
 export default function AdminPage() {
-  const [session,setSession] = useState<any>(null)
+  const [authed,setAuthed]   = useState(false)
   const [loading,setLoading] = useState(true)
   const [mounted,setMounted] = useState(false)
 
   useEffect(()=>{
     setMounted(true)
-    supabase.auth.getSession().then(({data})=>{setSession(data.session);setLoading(false)})
-    const {data:{subscription}} = supabase.auth.onAuthStateChange((_e,s)=>setSession(s))
-    return ()=>subscription.unsubscribe()
+    checkSession()
+      .then(({ok})=>setAuthed(ok))
+      .catch(()=>setAuthed(false))
+      .finally(()=>setLoading(false))
   },[])
 
   if(!mounted||loading) return <Loader text="Loading…" fullPage />
-  if(!session) return <LoginScreen />
-  return <Dashboard />
+  if(!authed) return <LoginScreen onLogin={()=>setAuthed(true)} />
+  return <Dashboard onLogout={()=>setAuthed(false)} />
 }
 
 // ══════════════════════════════════════════════
-// LOGIN — with forgot password flow
+// LOGIN — simple password, no Supabase
 // ══════════════════════════════════════════════
-function LoginScreen() {
-  const [mode,setMode]       = useState<'login'|'forgot'|'sent'>('login')
-  const [email,setEmail]     = useState('')
-  const [pass,setPass]       = useState('')
-  const [err,setErr]         = useState('')
-  const [busy,setBusy]       = useState(false)
+function LoginScreen({onLogin}:{onLogin:()=>void}) {
+  const [pass,setPass] = useState('')
+  const [err,setErr]   = useState('')
+  const [busy,setBusy] = useState(false)
 
   const login = async () => {
-    if(!email||!pass) return setErr('Please enter email and password')
-    setBusy(true);setErr('')
-    const {error:e} = await supabase.auth.signInWithPassword({email,password:pass})
-    if(e) setErr(e.message)
-    setBusy(false)
-  }
-
-  const sendReset = async () => {
-    if(!email) return setErr('Enter your email address first')
-    setBusy(true);setErr('')
-    const {error:e} = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/admin/reset-password`
-    })
-    if(e) { setErr(e.message); setBusy(false); return }
-    setMode('sent')
+    if(!pass) return setErr('Enter your password')
+    setBusy(true); setErr('')
+    try {
+      const {ok} = await loginWithPassword(pass)
+      if(ok) onLogin()
+      else setErr('Wrong password')
+    } catch {
+      setErr('Login failed — try again')
+    }
     setBusy(false)
   }
 
@@ -96,65 +90,21 @@ function LoginScreen() {
         <div style={{textAlign:'center',marginBottom:'2rem'}}>
           <div style={{fontSize:'2.5rem',marginBottom:'0.5rem'}}>🍽️</div>
           <h1 style={{color:'#fff',fontFamily:'Georgia,serif',fontSize:'1.5rem',fontWeight:700}}>Chizzychops Admin</h1>
-          <p style={{color:'rgba(255,255,255,0.4)',fontSize:'0.875rem',marginTop:'0.25rem'}}>
-            {mode==='login' ? 'Owner access only' : mode==='forgot' ? 'Reset your password' : 'Check your email'}
-          </p>
+          <p style={{color:'rgba(255,255,255,0.4)',fontSize:'0.875rem',marginTop:'0.25rem'}}>Owner access only</p>
         </div>
-
-        {mode === 'sent' ? (
-          <div style={{textAlign:'center'}}>
-            <div style={{fontSize:'3rem',marginBottom:'1rem'}}>📧</div>
-            <p style={{color:'rgba(255,255,255,0.7)',lineHeight:1.7,marginBottom:'1.5rem'}}>
-              Password reset link sent to <strong style={{color:'#F97316'}}>{email}</strong>.
-              Check your inbox and click the link to set a new password.
-            </p>
-            <button onClick={()=>setMode('login')} style={{color:'#F97316',fontWeight:700,background:'none',border:'none',cursor:'pointer',fontSize:'0.9rem'}}>
-              ← Back to Sign In
-            </button>
+        <div style={{display:'flex',flexDirection:'column',gap:'1rem'}}>
+          <div>
+            <label style={LBL}>Password</label>
+            <input type="password" placeholder="Enter admin password" value={pass}
+              onChange={e=>{setPass(e.target.value);setErr('')}}
+              onKeyDown={e=>e.key==='Enter'&&login()}
+              style={IS} autoComplete="current-password" autoFocus />
           </div>
-        ) : (
-          <div style={{display:'flex',flexDirection:'column',gap:'1rem'}}>
-            <div>
-              <label style={LBL}>Email Address</label>
-              <input type="email" placeholder="owner@chizzychops.com" value={email}
-                onChange={e=>{setEmail(e.target.value);setErr('')}}
-                onKeyDown={e=>e.key==='Enter'&&(mode==='login'?login():sendReset())}
-                style={IS} autoComplete="email" />
-            </div>
-
-            {mode==='login' && (
-              <div>
-                <label style={LBL}>Password</label>
-                <input type="password" placeholder="Your password" value={pass}
-                  onChange={e=>{setPass(e.target.value);setErr('')}}
-                  onKeyDown={e=>e.key==='Enter'&&login()}
-                  style={IS} autoComplete="current-password" />
-              </div>
-            )}
-
-            {err && <p style={{color:'#F87171',fontSize:'0.8125rem',textAlign:'center',lineHeight:1.5}}>{err}</p>}
-
-            {mode==='login' ? (
-              <>
-                <button onClick={login} disabled={busy} style={{...BP,opacity:busy?0.7:1}}>
-                  {busy?'Signing in…':'Sign In'}
-                </button>
-                <button onClick={()=>{setMode('forgot');setErr('')}} style={{background:'none',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'0.8125rem',cursor:'pointer',textAlign:'center',padding:'0.25rem'}}>
-                  Forgot your password?
-                </button>
-              </>
-            ) : (
-              <>
-                <button onClick={sendReset} disabled={busy} style={{...BP,opacity:busy?0.7:1,background:'linear-gradient(135deg,#8B5CF6,#6D28D9)'}}>
-                  {busy?'Sending…':'Send Reset Link'}
-                </button>
-                <button onClick={()=>{setMode('login');setErr('')}} style={{background:'none',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'0.8125rem',cursor:'pointer',textAlign:'center',padding:'0.25rem'}}>
-                  ← Back to Sign In
-                </button>
-              </>
-            )}
-          </div>
-        )}
+          {err&&<p style={{color:'#F87171',fontSize:'0.8125rem',textAlign:'center'}}>{err}</p>}
+          <button onClick={login} disabled={busy} style={{...BP,opacity:busy?0.7:1}}>
+            {busy?'Signing in…':'Sign In'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -163,16 +113,16 @@ function LoginScreen() {
 // ══════════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════════
-function Dashboard() {
-  const [tab,setTab]       = useState<Tab>('📋 Orders')
-  const [orders,setOrders] = useState<Order[]>([])
-  const [menu,setMenu]     = useState<MenuItem[]>([])
-  const [inbox,setInbox]   = useState<any[]>([])
-  const [loadO,setLoadO]   = useState(true)
-  const [loadM,setLoadM]   = useState(true)
-  const [loadI,setLoadI]   = useState(true)
-  const [toast,setToast]   = useState('')
-  const [newCnt,setNewCnt] = useState(0)
+function Dashboard({onLogout}:{onLogout:()=>void}) {
+  const [tab,setTab]           = useState<Tab>('📋 Orders')
+  const [orders,setOrders]     = useState<Order[]>([])
+  const [menu,setMenu]         = useState<MenuItem[]>([])
+  const [inbox,setInbox]       = useState<InboxItem[]>([])
+  const [loadO,setLoadO]       = useState(true)
+  const [loadM,setLoadM]       = useState(true)
+  const [loadI,setLoadI]       = useState(true)
+  const [toast,setToast]       = useState('')
+  const [newCnt,setNewCnt]     = useState(0)
   const [inboxCnt,setInboxCnt] = useState(0)
 
   const showToast = (msg:string) => {setToast(msg);setTimeout(()=>setToast(''),4000)}
@@ -194,16 +144,7 @@ function Dashboard() {
   const loadInbox = useCallback(async()=>{
     setLoadI(true)
     try{
-      const [c,r,cat] = await Promise.all([
-        supabase.from('contact_submissions').select('*').order('created_at',{ascending:false}).limit(50),
-        supabase.from('review_submissions').select('*').order('created_at',{ascending:false}).limit(50),
-        supabase.from('catering_submissions').select('*').order('created_at',{ascending:false}).limit(50),
-      ])
-      const all=[
-        ...(c.data||[]).map((x:any)=>({...x,_type:'contact'})),
-        ...(r.data||[]).map((x:any)=>({...x,_type:'review'})),
-        ...(cat.data||[]).map((x:any)=>({...x,_type:'catering'})),
-      ].sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())
+      const all = await fetchInbox()
       setInbox(all)
       setInboxCnt(all.length)
     }catch(e:any){showToast('❌ '+e.message)}
@@ -212,52 +153,43 @@ function Dashboard() {
 
   useEffect(()=>{loadOrders();loadMenu();loadInbox()},[])
 
-  // Realtime — orders
+  // Poll for new orders every 30s (replaces Supabase realtime)
   useEffect(()=>{
-    const ch = supabase.channel('admin-rt')
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'orders'},p=>{
-        const o=p.new as Order
-        setOrders(prev=>[o,...prev]);setNewCnt(n=>n+1)
-        showToast(`🆕 New order! ${o.id} — ${fmt(o.total)}`)
-        notifyWA(o)
-        try{new Audio('/notification.mp3').play()}catch{}
-      })
-      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'orders'},p=>{
-        setOrders(prev=>prev.map(x=>x.id===p.new.id?p.new as Order:x))
-      })
-      // Live inbox notifications
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'contact_submissions'},p=>{
-        const d=p.new as any
-        setInbox(prev=>[{...d,_type:'contact'},...prev])
-        setInboxCnt(n=>n+1)
-        showToast(`💬 New message from ${d.name}!`)
-      })
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'review_submissions'},p=>{
-        const d=p.new as any
-        setInbox(prev=>[{...d,_type:'review'},...prev])
-        setInboxCnt(n=>n+1)
-        showToast(`⭐ New review from ${d.name}!`)
-      })
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'catering_submissions'},p=>{
-        const d=p.new as any
-        setInbox(prev=>[{...d,_type:'catering'},...prev])
-        setInboxCnt(n=>n+1)
-        showToast(`🎉 Catering request from ${d.name}!`)
-      })
-      .subscribe()
-    return ()=>{supabase.removeChannel(ch)}
-  },[])
+    const id = setInterval(()=>{
+      loadOrders()
+      loadInbox()
+    }, 30_000)
+    return ()=>clearInterval(id)
+  },[loadOrders,loadInbox])
+
+  const handleLogout = async () => {
+    await logout()
+    onLogout()
+  }
 
   const notifyWA = (o:Order) => {
     const lines=(o.items as any[]).map(i=>`• ${i.name} x${i.qty} — ${fmt(i.price*i.qty)}`)
-    const msg=[`🆕 *NEW ORDER — ${o.id}*`,'',`👤 ${o.customer_name||'Unknown'}`,o.customer_phone?`📞 ${o.customer_phone}`:'','',...lines,'',`💰 *Total: ${fmt(o.total)}*`,(o as any).note?`📝 ${(o as any).note}`:'',((o as any).address)?`📍 ${(o as any).address}`:'','',`https://chizzychops.vercel.app/admin`].filter(Boolean).join('\n')
+    const msg=[
+      `🆕 *NEW ORDER — ${o.id}*`,'',
+      `👤 ${o.customer_name||'Unknown'}`,
+      o.customer_phone?`📞 ${o.customer_phone}`:'',
+      '',...lines,'',
+      `💰 *Total: ${fmt(o.total)}*`,
+      o.note?`📝 ${o.note}`:'',
+      o.address?`📍 ${o.address}`:'','',
+      `https://chizzychops.vercel.app/admin`,
+    ].filter(Boolean).join('\n')
     window.open(`https://wa.me/${OWNER_WA}?text=${encodeURIComponent(msg)}`,'_blank')
   }
 
   const onStatusChange = async(id:string,status:OrderStatus)=>{
-    try{await updateOrderStatus(id,status);showToast(`✅ ${id} → ${status}`)}
-    catch(e:any){showToast('❌ '+e.message)}
+    try{
+      const updated = await updateOrderStatus(id,status)
+      setOrders(prev=>prev.map(o=>o.id===id?updated:o))
+      showToast(`✅ ${id} → ${status}`)
+    }catch(e:any){showToast('❌ '+e.message)}
   }
+
   const onDeleteOrder = async(id:string)=>{
     if(!confirm(`Delete order ${id}?`))return
     try{await deleteOrder(id);setOrders(p=>p.filter(o=>o.id!==id));showToast('🗑 Deleted')}
@@ -285,7 +217,7 @@ function Dashboard() {
         </div>
         <div style={{display:'flex',gap:'0.5rem'}}>
           <a href="/" target="_blank" style={{...BS,fontSize:'0.75rem',padding:'0.375rem 0.75rem',textDecoration:'none'}}>🌐 Site</a>
-          <button onClick={()=>supabase.auth.signOut()} style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.4)',padding:'0.375rem 0.75rem',borderRadius:'0.5rem',cursor:'pointer',fontSize:'0.75rem'}}>Sign Out</button>
+          <button onClick={handleLogout} style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.4)',padding:'0.375rem 0.75rem',borderRadius:'0.5rem',cursor:'pointer',fontSize:'0.75rem'}}>Sign Out</button>
         </div>
       </div>
 
@@ -302,10 +234,10 @@ function Dashboard() {
       </div>
 
       <div style={{maxWidth:'1280px',margin:'0 auto',padding:'1rem'}}>
-        {tab==='📋 Orders' && <OrdersPanel orders={orders} loading={loadO} onStatusChange={onStatusChange} onDelete={onDeleteOrder} onNotify={notifyWA} onRefresh={loadOrders} todayCount={today.length} activeCount={active.length} revenue={revenue}/>}
-        {tab==='🍽️ Menu'   && <MenuPanel items={menu} loading={loadM} onRefresh={loadMenu} showToast={showToast}/>}
-        {tab==='💬 Inbox'  && <InboxPanel items={inbox} loading={loadI} onRefresh={loadInbox}/>}
-        {tab==='📊 Stats'  && <StatsPanel orders={orders} menuItems={menu} inbox={inbox}/>}
+        {tab==='📋 Orders'&&<OrdersPanel orders={orders} loading={loadO} onStatusChange={onStatusChange} onDelete={onDeleteOrder} onNotify={notifyWA} onRefresh={loadOrders} todayCount={today.length} activeCount={active.length} revenue={revenue}/>}
+        {tab==='🍽️ Menu'  &&<MenuPanel items={menu} loading={loadM} onRefresh={loadMenu} showToast={showToast}/>}
+        {tab==='💬 Inbox' &&<InboxPanel items={inbox} loading={loadI} onRefresh={loadInbox}/>}
+        {tab==='📊 Stats' &&<StatsPanel orders={orders} menuItems={menu} inbox={inbox}/>}
       </div>
 
       {toast&&(
@@ -313,15 +245,15 @@ function Dashboard() {
           {toast}
         </div>
       )}
-      <style>{`@keyframes pulse2{0%,100%{opacity:1}50%{opacity:0.5}} select option{background:#1A0800;color:#fff} @media(max-width:700px){.mobile-cards{display:flex!important;flex-direction:column;gap:0.625rem}.desktop-table{display:none!important}}`}</style>
+      <style>{`@keyframes pulse2{0%,100%{opacity:1}50%{opacity:0.5}} select option{background:#1A0800;color:#fff}`}</style>
     </div>
   )
 }
 
 // ══════════════════════════════════════════════
-// INBOX PANEL — Contact, Reviews, Catering
+// INBOX PANEL
 // ══════════════════════════════════════════════
-function InboxPanel({items,loading,onRefresh}:{items:any[];loading:boolean;onRefresh:()=>void}) {
+function InboxPanel({items,loading,onRefresh}:{items:InboxItem[];loading:boolean;onRefresh:()=>void}) {
   const [filter,setFilter] = useState<'all'|'contact'|'review'|'catering'>('all')
   const shown = filter==='all' ? items : items.filter(i=>i._type===filter)
 
@@ -355,7 +287,6 @@ function InboxPanel({items,loading,onRefresh}:{items:any[];loading:boolean;onRef
             const cfg=typeConfig[item._type]
             return (
               <div key={item.id} style={{background:'#120600',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'0.875rem',padding:'1rem',display:'flex',flexDirection:'column',gap:'0.5rem'}}>
-                {/* Header */}
                 <div style={{display:'flex',alignItems:'center',gap:'0.625rem',flexWrap:'wrap'}}>
                   <span style={{background:cfg.bg,color:cfg.color,fontSize:'0.625rem',fontWeight:800,padding:'0.2rem 0.5rem',borderRadius:'9999px'}}>{cfg.icon} {cfg.label}</span>
                   <span style={{color:'#fff',fontWeight:700,fontSize:'0.875rem'}}>{item.name}</span>
@@ -364,7 +295,6 @@ function InboxPanel({items,loading,onRefresh}:{items:any[];loading:boolean;onRef
                   <span style={{color:'rgba(255,255,255,0.3)',fontSize:'0.6875rem',marginLeft:'auto'}}>{timeAgo(item.created_at)}</span>
                 </div>
 
-                {/* Content by type */}
                 {item._type==='contact'&&(
                   <div style={{background:'rgba(255,255,255,0.03)',borderRadius:'0.625rem',padding:'0.75rem'}}>
                     <p style={{color:'rgba(255,255,255,0.7)',fontSize:'0.875rem',lineHeight:1.7}}>{item.message}</p>
@@ -398,7 +328,6 @@ function InboxPanel({items,loading,onRefresh}:{items:any[];loading:boolean;onRef
                   </div>
                 )}
 
-                {/* Reply on WhatsApp */}
                 {item.phone&&(
                   <a href={`https://wa.me/${item.phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Hi ${item.name}! Thanks for reaching out to Chizzychops & Grillz 🍽️`)}`}
                     target="_blank" rel="noopener noreferrer"
@@ -460,7 +389,8 @@ function OrdersPanel({orders,loading,onStatusChange,onDelete,onNotify,onRefresh,
       ):(
         <div style={{display:'flex',flexDirection:'column',gap:'0.5rem'}}>
           {shown.map((order:Order)=>{
-            const cfg=STATUS[order.status]; const isExp=expanded===order.id
+            const cfg=STATUS[order.status as OrderStatus]??STATUS.new
+            const isExp=expanded===order.id
             return (
               <div key={order.id} style={{background:'#120600',border:`1px solid ${order.status==='new'?'rgba(96,165,250,0.35)':'rgba(255,255,255,0.07)'}`,borderRadius:'0.875rem',overflow:'hidden'}}>
                 <div style={{display:'flex',alignItems:'center',gap:'0.5rem',padding:'0.75rem 0.875rem',cursor:'pointer',flexWrap:'wrap'}} onClick={()=>setExpanded(isExp?null:order.id)}>
@@ -486,8 +416,8 @@ function OrdersPanel({orders,loading,onStatusChange,onDelete,onNotify,onRefresh,
                       </div>
                     </div>
                     {order.customer_phone&&<p style={{color:'#25D366',fontSize:'0.8125rem',marginBottom:'0.375rem'}}>📞 {order.customer_phone}</p>}
-                    {(order as any).note&&<p style={{color:'rgba(255,255,255,0.6)',fontSize:'0.8125rem',marginBottom:'0.375rem'}}>📝 {(order as any).note}</p>}
-                    {(order as any).address&&<p style={{color:'rgba(255,255,255,0.6)',fontSize:'0.8125rem',marginBottom:'0.75rem'}}>📍 {(order as any).address}</p>}
+                    {order.note&&<p style={{color:'rgba(255,255,255,0.6)',fontSize:'0.8125rem',marginBottom:'0.375rem'}}>📝 {order.note}</p>}
+                    {order.address&&<p style={{color:'rgba(255,255,255,0.6)',fontSize:'0.8125rem',marginBottom:'0.75rem'}}>📍 {order.address}</p>}
                     <div style={{display:'flex',gap:'0.375rem',flexWrap:'wrap',alignItems:'center'}}>
                       {cfg.next&&<button onClick={()=>onStatusChange(order.id,cfg.next!)} style={{...BP,fontSize:'0.75rem',padding:'0.4375rem 0.875rem'}}>→ {STATUS[cfg.next].label}</button>}
                       {!['delivered','cancelled'].includes(order.status)&&<button onClick={()=>onStatusChange(order.id,'cancelled')} style={{background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.2)',color:'#F87171',padding:'0.4375rem 0.875rem',borderRadius:'9999px',cursor:'pointer',fontSize:'0.75rem',fontWeight:700}}>Cancel</button>}
@@ -636,7 +566,7 @@ function MenuPanel({items,loading,onRefresh,showToast}:{items:MenuItem[];loading
 // ══════════════════════════════════════════════
 // STATS PANEL
 // ══════════════════════════════════════════════
-function StatsPanel({orders,menuItems,inbox}:{orders:Order[];menuItems:MenuItem[];inbox:any[]}) {
+function StatsPanel({orders,menuItems,inbox}:{orders:Order[];menuItems:MenuItem[];inbox:InboxItem[]}) {
   const topItems = orders.flatMap(o=>o.items as any[]).reduce((acc:Record<string,any>,item:any)=>{
     if(!acc[item.id])acc[item.id]={name:item.name,qty:0,revenue:0}
     acc[item.id].qty+=item.qty;acc[item.id].revenue+=item.price*item.qty;return acc
@@ -645,7 +575,6 @@ function StatsPanel({orders,menuItems,inbox}:{orders:Order[];menuItems:MenuItem[
 
   return (
     <div style={{display:'flex',flexDirection:'column',gap:'1.5rem'}}>
-      {/* Inbox summary */}
       <div>
         <h3 style={{color:'#fff',fontWeight:700,fontSize:'0.9375rem',marginBottom:'0.75rem'}}>Submission Summary</h3>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:'0.625rem'}}>
@@ -657,7 +586,6 @@ function StatsPanel({orders,menuItems,inbox}:{orders:Order[];menuItems:MenuItem[
           ))}
         </div>
       </div>
-      {/* Order status */}
       <div>
         <h3 style={{color:'#fff',fontWeight:700,fontSize:'0.9375rem',marginBottom:'0.75rem'}}>Orders by Status</h3>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:'0.625rem'}}>
@@ -697,12 +625,13 @@ function EditModal({item,onClose,onSaved}:{item:Omit<MenuItem,'updated_at'>;onCl
   const [err,setErr]     = useState('')
   const [upImg,setUpI]   = useState(false)
   const [upImg2,setUpI2] = useState(false)
-  const r1=useRef<HTMLInputElement>(null); const r2=useRef<HTMLInputElement>(null)
+  const r1=useRef<HTMLInputElement>(null)
+  const r2=useRef<HTMLInputElement>(null)
 
   const set=(k:keyof typeof form,v:any)=>setForm(f=>({...f,[k]:v||null}))
 
   const handleUpload=async(file:File,field:'img_url'|'img2_url')=>{
-    const setU=field==='img_url'?setUpI:setUpI2;setU(true)
+    const setU=field==='img_url'?setUpI:setUpI2; setU(true)
     try{const url=await uploadImage(file);set(field,url)}
     catch(e:any){setErr('Upload failed: '+e.message)}
     setU(false)
@@ -780,6 +709,9 @@ function EditModal({item,onClose,onSaved}:{item:Omit<MenuItem,'updated_at'>;onCl
   )
 }
 
+// ══════════════════════════════════════════════
+// SHARED COMPONENTS
+// ══════════════════════════════════════════════
 function F({label,children,hint,span}:{label:string;children:React.ReactNode;hint?:string;span?:boolean}) {
   return (
     <div style={{gridColumn:span?'1 / -1':undefined}}>
@@ -802,6 +734,6 @@ function Loader({text,fullPage}:{text:string;fullPage?:boolean}) {
 }
 
 const LBL: React.CSSProperties = {display:'block',color:'rgba(255,255,255,0.5)',fontSize:'0.75rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:'0.375rem'}
-const IS: React.CSSProperties  = {width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',borderRadius:'0.625rem',padding:'0.625rem 0.875rem',fontSize:'0.9rem',outline:'none',fontFamily:'system-ui,sans-serif',boxSizing:'border-box'}
-const BP: React.CSSProperties  = {background:'linear-gradient(135deg,#F97316,#DC2626)',color:'#fff',fontWeight:800,fontSize:'0.9375rem',padding:'0.8125rem 1.75rem',borderRadius:'9999px',border:'none',cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center',gap:'0.4rem'}
-const BS: React.CSSProperties  = {background:'rgba(255,255,255,0.06)',color:'#fff',fontWeight:700,fontSize:'0.9375rem',padding:'0.8125rem 1.75rem',borderRadius:'9999px',border:'1px solid rgba(255,255,255,0.12)',cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}
+const IS:  React.CSSProperties = {width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'#fff',borderRadius:'0.625rem',padding:'0.625rem 0.875rem',fontSize:'0.9rem',outline:'none',fontFamily:'system-ui,sans-serif',boxSizing:'border-box'}
+const BP:  React.CSSProperties = {background:'linear-gradient(135deg,#F97316,#DC2626)',color:'#fff',fontWeight:800,fontSize:'0.9375rem',padding:'0.8125rem 1.75rem',borderRadius:'9999px',border:'none',cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center',gap:'0.4rem'}
+const BS:  React.CSSProperties = {background:'rgba(255,255,255,0.06)',color:'#fff',fontWeight:700,fontSize:'0.9375rem',padding:'0.8125rem 1.75rem',borderRadius:'9999px',border:'1px solid rgba(255,255,255,0.12)',cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center'}
