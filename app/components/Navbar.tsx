@@ -8,10 +8,10 @@ import { usePathname } from 'next/navigation'
 const WA = 'https://wa.me/2348094946923?text=Hi%20Chizzychops%20%26%20Grillz!%20I%27d%20like%20to%20place%20an%20order%20%F0%9F%8D%BD%EF%B8%8F'
 
 const links = [
-  { href: '/#about',    label: 'About'    },
-  { href: '/menu',      label: 'Menu'     },
-  { href: '/services',  label: 'Services' },
-  { href: '/#contact',  label: 'Contact'  },
+  { href: '/#about',   label: 'About',    hash: 'about'   },
+  { href: '/menu',     label: 'Menu',     hash: null       },
+  { href: '/services', label: 'Services', hash: null       },
+  { href: '/#contact', label: 'Contact',  hash: 'contact'  },
 ]
 
 export default function Navbar() {
@@ -30,13 +30,23 @@ export default function Navbar() {
     return () => { document.body.style.overflow = '' }
   }, [open])
 
-  // Close mobile menu on route change
   useEffect(() => { setOpen(false) }, [pathname])
 
   const isActive = (href: string) => {
     if (href === '/menu')     return pathname === '/menu'
     if (href === '/services') return pathname === '/services'
     return false
+  }
+
+  const handleHashLink = (e: React.MouseEvent, hash: string | null) => {
+    if (!hash) return
+    e.preventDefault()
+    if (pathname === '/') {
+      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' })
+    } else {
+      window.location.href = `/#${hash}`
+    }
+    setOpen(false)
   }
 
   return (
@@ -67,6 +77,7 @@ export default function Navbar() {
             <div style={{ display:'flex', alignItems:'center', gap:'1.75rem' }} className="desktop-nav">
               {links.map(l => (
                 <Link key={l.href} href={l.href}
+                  onClick={(e) => handleHashLink(e, l.hash)}
                   style={{
                     color: isActive(l.href) ? '#F97316' : 'rgba(255,255,255,0.6)',
                     fontSize:'0.875rem', fontWeight: isActive(l.href) ? 800 : 600,
@@ -117,7 +128,8 @@ export default function Navbar() {
           <div className="container" style={{ paddingTop:'1.5rem', paddingBottom:'2rem' }}>
             <div style={{ display:'flex', flexDirection:'column', gap:'0.25rem', marginBottom:'2rem' }}>
               {links.map(l => (
-                <Link key={l.href} href={l.href} onClick={() => setOpen(false)}
+                <Link key={l.href} href={l.href}
+                  onClick={(e) => handleHashLink(e, l.hash)}
                   style={{
                     color: isActive(l.href) ? '#F97316' : 'rgba(255,255,255,0.8)',
                     fontSize:'1.125rem', fontWeight:700, textDecoration:'none',
