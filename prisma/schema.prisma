@@ -9,96 +9,76 @@ datasource db {
 model MenuItem {
   id          String   @id @default(cuid())
   name        String
-  price       Float
+  price       Int
   category    String
   subcat      String?
-  description String
+  description String   @default("")
   badge       String?
   badgeColor  String?  @map("badge_color")
   note        String?
-  imgUrl      String   @map("img_url")
+  imgUrl      String   @default("") @map("img_url")
   img2Url     String?  @map("img2_url")
-  sortOrder   Int      @default(0) @map("sort_order")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  sortOrder   Int      @default(99) @map("sort_order")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("menu_items")
 }
 
 model Order {
-  id              String      @id @default(cuid())
-  reference       String      @unique
-  customerName    String      @map("customer_name")
-  customerEmail   String      @map("customer_email")
-  customerPhone   String      @map("customer_phone")
-  deliveryAddress String      @map("delivery_address")
-  items           Json
-  subtotal        Int
-  deliveryFee     Int         @default(0) @map("delivery_fee")
-  total           Int
-  status          OrderStatus @default(new)
-  paystackData    Json?       @map("paystack_data")
-  whatsappSent    Boolean     @default(false) @map("whatsapp_sent")
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  id            String   @id @default(dbgenerated("('ORD-'::text || upper(\"substring\"((gen_random_uuid())::text, 1, 8)))"))
+  customerName  String?  @map("customer_name")
+  customerPhone String?  @map("customer_phone")
+  items         Json
+  total         Int
+  status        String   @default("new")
+  note          String?
+  address       String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@index([reference])
-  @@index([status])
-  @@index([createdAt(sort: Desc)])
   @@map("orders")
 }
 
 model ContactSubmission {
-  id        String   @id @default(cuid())
+  id        String   @id @default(dbgenerated("('MSG-'::text || upper(\"substring\"((gen_random_uuid())::text, 1, 8)))"))
   name      String
   phone     String
   email     String?
   message   String
   type      String   @default("contact")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("contact_submissions")
 }
 
 model ReviewSubmission {
-  id         String   @id @default(cuid())
+  id         String   @id @default(dbgenerated("('REV-'::text || upper(\"substring\"((gen_random_uuid())::text, 1, 8)))"))
   name       String
   dish       String
   overall    Int
-  taste      Int
-  portion    Int
-  delivery   Int
-  packaging  Int
-  value      Int
-  recommend  Boolean
+  taste      Int      @default(0)
+  portion    Int      @default(0)
+  delivery   Int      @default(0)
+  packaging  Int      @default(0)
+  value      Int      @default(0)
+  recommend  Boolean  @default(true)
   reviewText String   @map("review_text")
   type       String   @default("review")
-  createdAt  DateTime @default(now()) @map("created_at")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("review_submissions")
 }
 
 model CateringSubmission {
-  id        String   @id @default(cuid())
+  id        String   @id @default(dbgenerated("('CAT-'::text || upper(\"substring\"((gen_random_uuid())::text, 1, 8)))"))
   name      String
   phone     String
   eventDate String   @map("event_date")
   guests    String
-  eventType String   @map("event_type")
-  notes     String
+  eventType String   @default("") @map("event_type")
+  notes     String   @default("")
   type      String   @default("catering")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("catering_submissions")
-}
-
-enum OrderStatus {
-  new
-  pending
-  paid
-  failed
-  confirmed
-  preparing
-  ready
-  delivered
-  cancelled
 }
