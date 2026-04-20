@@ -36,7 +36,7 @@ model Order {
   deliveryFee     Int      @default(0) @map("delivery_fee")
   total           Int      @default(0)
   status          String   @default("pending")
-  paystackData    Json?    @map("paystack_data")
+
   whatsappSent    Boolean  @default(false) @map("whatsapp_sent")
   note            String?
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
