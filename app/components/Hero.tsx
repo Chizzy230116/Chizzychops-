@@ -147,7 +147,7 @@ export default function Hero() {
               <WAIcon /> Order on WhatsApp
             </a>
 
-            <a href="#menu"
+            <a href="/menu"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
                 padding: 'clamp(0.8125rem, 2.5vw, 1rem) clamp(1.375rem, 4vw, 1.875rem)',
