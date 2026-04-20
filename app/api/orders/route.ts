@@ -9,6 +9,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/app/lib/prisma'
 
+// ─── helper ──────────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapOrder(o: any) {
+  return {
+    id:               o.id               as string,
+    reference:        o.reference        as string,
+    customer_name:    o.customerName     as string,
+    customer_email:   o.customerEmail    as string,
+    customer_phone:   o.customerPhone    as string,
+    delivery_address: o.deliveryAddress  as string,
+    items:            o.items,
+    subtotal:         o.subtotal         as number,
+    delivery_fee:     o.deliveryFee      as number,
+    total:            o.total            as number,
+    status:           o.status           as string,
+    whatsapp_sent:    o.whatsappSent     as boolean,
+    note:             o.note             as string | null,
+    created_at:       (o.createdAt as Date).toISOString(),
+    updated_at:       (o.updatedAt as Date).toISOString(),
+  }
+}
+
 // ─── GET ─────────────────────────────────────────────────────────────────────
 
 export async function GET() {
@@ -17,20 +40,7 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     })
 
-    const mapped = orders.map(o => ({
-      id:             o.id,
-      customer_name:  o.customerName,
-      customer_phone: o.customerPhone,
-      items:          o.items,
-      total:          o.total,
-      status:         o.status,
-      note:           o.note,
-      address:        o.address,
-      created_at:     o.createdAt.toISOString(),
-      updated_at:     o.updatedAt.toISOString(),
-    }))
-
-    return NextResponse.json(mapped)
+    return NextResponse.json(orders.map(mapOrder))
   } catch (err) {
     console.error('GET /api/orders error:', err)
     return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 })
@@ -52,18 +62,7 @@ export async function PATCH(req: NextRequest) {
       data:  { status },
     })
 
-    return NextResponse.json({
-      id:             order.id,
-      customer_name:  order.customerName,
-      customer_phone: order.customerPhone,
-      items:          order.items,
-      total:          order.total,
-      status:         order.status,
-      note:           order.note,
-      address:        order.address,
-      created_at:     order.createdAt.toISOString(),
-      updated_at:     order.updatedAt.toISOString(),
-    })
+    return NextResponse.json(mapOrder(order))
   } catch (err) {
     console.error('PATCH /api/orders error:', err)
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })

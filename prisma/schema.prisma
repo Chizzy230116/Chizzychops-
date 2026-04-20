@@ -25,17 +25,26 @@ model MenuItem {
 }
 
 model Order {
-  id            String   @id @default(dbgenerated("('ORD-'::text || upper(\"substring\"((gen_random_uuid())::text, 1, 8)))"))
-  customerName  String?  @map("customer_name")
-  customerPhone String?  @map("customer_phone")
-  items         Json
-  total         Int
-  status        String   @default("new")
-  note          String?
-  address       String?
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String   @id @default(dbgenerated("('ORD-'::text || upper(\"substring\"((gen_random_uuid())::text, 1, 8)))"))
+  reference       String   @unique @default(dbgenerated("('REF-'::text || upper(\"substring\"((gen_random_uuid())::text, 1, 12)))"))
+  customerName    String   @default("") @map("customer_name")
+  customerEmail   String   @default("") @map("customer_email")
+  customerPhone   String   @default("") @map("customer_phone")
+  deliveryAddress String   @default("") @map("delivery_address")
+  items           Json     @default("[]")
+  subtotal        Int      @default(0)
+  deliveryFee     Int      @default(0) @map("delivery_fee")
+  total           Int      @default(0)
+  status          String   @default("pending")
+  paystackData    Json?    @map("paystack_data")
+  whatsappSent    Boolean  @default(false) @map("whatsapp_sent")
+  note            String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  @@index([reference])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
   @@map("orders")
 }
 

@@ -146,8 +146,8 @@ export default function Navbar() {
               <WAIconSm /> Order on WhatsApp
             </a>
             <div style={{ marginTop:'2rem', paddingTop:'2rem', borderTop:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
-              <p style={{ color:'rgba(255,255,255,0.3)', fontSize:'0.8125rem' }}>📍 Santos Estate, Akowonjo, Lagos</p>
-              <p style={{ color:'rgba(255,255,255,0.3)', fontSize:'0.8125rem', marginTop:'0.25rem' }}>⏰ Open Daily · Closes 8PM</p>
+              {/* <p style={{ color:'rgba(255,255,255,0.3)', fontSize:'0.8125rem' }}>📍 Santos Estate, Akowonjo, Lagos</p> */}
+              <p style={{ color:'rgba(255,255,255,0.3)', fontSize:'0.8125rem', marginTop:'0.25rem' }}>⏰Mon–Sat: 6AM–8PM','Sunday: 12PM–6PM</p>
             </div>
           </div>
         </div>
