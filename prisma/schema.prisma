@@ -4,12 +4,13 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model MenuItem {
   id          String   @id @default(cuid())
   name        String
-  price       Int
+  price       Float
   category    String
   subcat      String?
   description String   @default("")
@@ -25,8 +26,8 @@ model MenuItem {
 }
 
 model Order {
-  id              String   @id @default(dbgenerated("('ORD-'::text || upper(\"substring\"((gen_random_uuid())::text, 1, 8)))"))
-  reference       String   @unique @default(dbgenerated("('REF-'::text || upper(\"substring\"((gen_random_uuid())::text, 1, 12)))"))
+  id              String   @id @default(dbgenerated("('ORD-' || LPAD(nextval('orders_id_seq')::TEXT, 6, '0'))"))
+  reference       String   @unique @default(dbgenerated("('REF-' || UPPER(SUBSTRING(gen_random_uuid()::TEXT, 1, 10)))"))
   customerName    String   @default("") @map("customer_name")
   customerEmail   String   @default("") @map("customer_email")
   customerPhone   String   @default("") @map("customer_phone")
@@ -36,7 +37,7 @@ model Order {
   deliveryFee     Int      @default(0) @map("delivery_fee")
   total           Int      @default(0)
   status          String   @default("pending")
-
+  paystackData    Json?    @map("paystack_data")
   whatsappSent    Boolean  @default(false) @map("whatsapp_sent")
   note            String?
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -49,7 +50,7 @@ model Order {
 }
 
 model ContactSubmission {
-  id        String   @id @default(dbgenerated("('MSG-'::text || upper(\"substring\"((gen_random_uuid())::text, 1, 8)))"))
+  id        String   @id @default(dbgenerated("('MSG-' || LPAD(nextval('contact_id_seq')::TEXT, 5, '0'))"))
   name      String
   phone     String
   email     String?
@@ -61,7 +62,7 @@ model ContactSubmission {
 }
 
 model ReviewSubmission {
-  id         String   @id @default(dbgenerated("('REV-'::text || upper(\"substring\"((gen_random_uuid())::text, 1, 8)))"))
+  id         String   @id @default(dbgenerated("('REV-' || LPAD(nextval('review_id_seq')::TEXT, 5, '0'))"))
   name       String
   dish       String
   overall    Int
@@ -79,7 +80,7 @@ model ReviewSubmission {
 }
 
 model CateringSubmission {
-  id        String   @id @default(dbgenerated("('CAT-'::text || upper(\"substring\"((gen_random_uuid())::text, 1, 8)))"))
+  id        String   @id @default(dbgenerated("('CAT-' || LPAD(nextval('catering_id_seq')::TEXT, 5, '0'))"))
   name      String
   phone     String
   eventDate String   @map("event_date")
