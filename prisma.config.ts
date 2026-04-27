@@ -12,12 +12,15 @@
 //     url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"]!,
 //   },
 // });
-import "dotenv/config";
-import { defineConfig, env } from "prisma/config";
+import 'dotenv/config'
+import { defineConfig } from 'prisma/config'
 
 export default defineConfig({
-  schema: "prisma/schema.prisma",
-  datasource: {
-    url: env("DIRECT_URL"),
+  schema: 'prisma/schema.prisma',
+  migrations: {
+    seed: 'npx ts-node --compiler-options {"module":"CommonJS"} prisma/seed.ts',
   },
-});
+  datasource: {
+    url: process.env.DIRECT_URL ?? process.env.DATABASE_URL!,
+  },
+})
