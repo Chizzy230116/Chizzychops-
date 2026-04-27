@@ -27,6 +27,7 @@ function mapOrder(o: any) {
     status:           o.status           as string,
     whatsapp_sent:    o.whatsappSent     as boolean,
     note:             o.note             as string | null,
+    address:          o.deliveryAddress  as string | null,
     created_at:       (o.createdAt as Date).toISOString(),
     updated_at:       (o.updatedAt as Date).toISOString(),
   }
@@ -39,7 +40,6 @@ export async function GET() {
     const orders = await prisma.order.findMany({
       orderBy: { createdAt: 'desc' },
     })
-
     return NextResponse.json(orders.map(mapOrder))
   } catch (err) {
     console.error('GET /api/orders error:', err)

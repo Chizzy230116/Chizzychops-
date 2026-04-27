@@ -1,7 +1,6 @@
 /**
  * app/api/review/route.ts
  */
-
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/app/lib/prisma'
 
@@ -14,22 +13,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-   const submission = await prisma.reviewSubmission.create({
-  data: {
-    id:         `REV-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-    name,
-    dish,
-    overall:    Number(overall),
-    taste:      Number(taste)     || 0,
-    portion:    Number(portion)   || 0,
-    delivery:   Number(delivery)  || 0,
-    packaging:  Number(packaging) || 0,
-    value:      Number(value)     || 0,
-    recommend:  recommend ?? true,
-    reviewText: review_text,
-    type:       'review',
-  },
-})
+    const submission = await prisma.reviewSubmission.create({
+      data: {
+        // id is SERIAL — auto-generated, do NOT pass it
+        name,
+        dish,
+        overall:    Number(overall),
+        taste:      Number(taste)     || 0,
+        portion:    Number(portion)   || 0,
+        delivery:   Number(delivery)  || 0,
+        packaging:  Number(packaging) || 0,
+        value:      Number(value)     || 0,
+        recommend:  recommend ?? true,
+        reviewText: review_text,
+        type:       'review',
+      },
+    })
 
     return NextResponse.json({ success: true, id: submission.id })
   } catch (err) {

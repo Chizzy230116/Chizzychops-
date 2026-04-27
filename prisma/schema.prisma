@@ -1,3 +1,6 @@
+// prisma/schema.prisma
+// Prisma 7 — url/directUrl moved to prisma.config.ts
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -16,7 +19,7 @@ model MenuItem {
   badge       String?
   badgeColor  String?  @map("badge_color")
   note        String?
-  imgUrl      String   @default("") @map("img_url")
+  imgUrl      String?  @map("img_url")
   img2Url     String?  @map("img2_url")
   sortOrder   Int      @default(99) @map("sort_order")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)

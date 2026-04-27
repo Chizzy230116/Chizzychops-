@@ -1,7 +1,6 @@
 /**
  * app/api/catering/route.ts
  */
-
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/app/lib/prisma'
 
@@ -15,17 +14,17 @@ export async function POST(req: NextRequest) {
     }
 
     const submission = await prisma.cateringSubmission.create({
-  data: {
-    id:        `CAT-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-    name,
-    phone,
-    eventDate: event_date,
-    guests,
-    eventType: event_type || '',
-    notes:     notes      || '',
-    type:      'catering',
-  },
-})
+      data: {
+        // id is SERIAL — auto-generated, do NOT pass it
+        name,
+        phone,
+        eventDate: event_date,
+        guests,
+        eventType: event_type || '',
+        notes:     notes      || '',
+        type:      'catering',
+      },
+    })
 
     return NextResponse.json({ success: true, id: submission.id })
   } catch (err) {

@@ -1,8 +1,6 @@
 /**
  * app/lib/api.ts
- *
- * All types (matching Prisma schema exactly) + fetch helpers.
- * Zero Supabase — everything goes through Prisma API routes.
+ * All types matching Prisma schema exactly + fetch helpers.
  */
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -12,7 +10,7 @@ export type OrderStatus =
   | 'preparing' | 'ready' | 'delivered' | 'cancelled'
 
 export interface MenuItem {
-  id:          string
+  id:          number        // ← Int (SERIAL) not string
   name:        string
   price:       number
   category:    string
@@ -21,27 +19,33 @@ export interface MenuItem {
   badge:       string | null
   badge_color: string | null
   note:        string | null
-  img_url:     string
+  img_url:     string | null // ← nullable now
   img2_url:    string | null
   sort_order:  number
   updated_at:  string
 }
 
 export interface Order {
-  id:             string
-  customer_name:  string | null
-  customer_phone: string | null
-  items:          unknown
-  total:          number
-  status:         string
-  note:           string | null
-  address:        string | null
-  created_at:     string
-  updated_at:     string
+  id:               string
+  reference:        string
+  customer_name:    string
+  customer_email:   string
+  customer_phone:   string
+  delivery_address: string
+  items:            unknown
+  subtotal:         number
+  delivery_fee:     number
+  total:            number
+  status:           string
+  whatsapp_sent:    boolean
+  note:             string | null
+  address:          string | null
+  created_at:       string
+  updated_at:       string
 }
 
 export interface ContactSubmission {
-  id:         string
+  id:         number
   name:       string
   phone:      string
   email:      string | null
@@ -52,7 +56,7 @@ export interface ContactSubmission {
 }
 
 export interface ReviewSubmission {
-  id:          string
+  id:          number
   name:        string
   dish:        string
   overall:     number
@@ -69,7 +73,7 @@ export interface ReviewSubmission {
 }
 
 export interface CateringSubmission {
-  id:         string
+  id:         number
   name:       string
   phone:      string
   event_date: string
@@ -99,21 +103,21 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-export const checkSession = ()                      => api<{ ok: boolean }>('/api/auth')
-export const loginWithPassword = (password: string) => api<{ ok: boolean }>('/api/auth', { method: 'POST', body: JSON.stringify({ password }) })
-export const logout = ()                            => api<{ ok: boolean }>('/api/auth', { method: 'DELETE' })
+export const checkSession      = ()                      => api<{ ok: boolean }>('/api/auth')
+export const loginWithPassword = (password: string)      => api<{ ok: boolean }>('/api/auth', { method: 'POST', body: JSON.stringify({ password }) })
+export const logout            = ()                      => api<{ ok: boolean }>('/api/auth', { method: 'DELETE' })
 
 // ─── Menu ─────────────────────────────────────────────────────────────────────
 
-export const fetchMenu  = ()                         => api<MenuItem[]>('/api/menu')
-export const upsertItem = (item: Partial<MenuItem>)  => api<MenuItem>('/api/menu', { method: 'POST', body: JSON.stringify(item) })
-export const deleteItem = (id: string)               => api<void>(`/api/menu?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+export const fetchMenu  = ()                          => api<MenuItem[]>('/api/menu')
+export const upsertItem = (item: Partial<MenuItem>)   => api<MenuItem>('/api/menu', { method: 'POST', body: JSON.stringify(item) })
+export const deleteItem = (id: number)                => api<void>(`/api/menu?id=${id}`, { method: 'DELETE' })  // ← number not string
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
-export const fetchOrders       = ()                                => api<Order[]>('/api/orders')
-export const updateOrderStatus = (id: string, status: OrderStatus) => api<Order>('/api/orders', { method: 'PATCH', body: JSON.stringify({ id, status }) })
-export const deleteOrder       = (id: string)                      => api<void>(`/api/orders?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+export const fetchOrders       = ()                                 => api<Order[]>('/api/orders')
+export const updateOrderStatus = (id: string, status: OrderStatus)  => api<Order>('/api/orders', { method: 'PATCH', body: JSON.stringify({ id, status }) })
+export const deleteOrder       = (id: string)                       => api<void>(`/api/orders?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 
 // ─── Inbox ────────────────────────────────────────────────────────────────────
 
